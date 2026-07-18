@@ -1,0 +1,3 @@
+export function ArrowUpRight() { return <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 13 13 3M5 3h8v8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg> }
+export function SparkIcon() { return <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5c.5 3.5 2.2 5.2 5.7 5.7C10.2 7.7 8.5 9.4 8 13c-.5-3.5-2.2-5.3-5.7-5.8C5.8 6.7 7.5 5 8 1.5Z" fill="currentColor" /></svg> }
+export function CheckIcon() { return <svg viewBox="0 0 18 18" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="8" stroke="currentColor" /><path d="m5.6 9.2 2.1 2.1 4.7-4.6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg> }

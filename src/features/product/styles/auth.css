@@ -1,0 +1,12 @@
+@media (max-width: 900px) {
+  .auth-page { grid-template-columns:1fr; }
+  .auth-story { display:none; }
+  .auth-form-side { padding:24px; }
+  .auth-card { padding:27px; }
+}
+
+@media (max-width: 440px) {
+  .auth-form-side { padding:14px; }
+  .auth-card { padding:24px 20px;border-radius:18px; }
+  .auth-heading h2 { font-size:27px; }
+}

@@ -13,6 +13,8 @@ const SettingsPage = lazy(() => import('./features/product/pages/SettingsPage').
 const TemplateDetailPage = lazy(() => import('./features/product/pages/TemplateDetailPage').then((module) => ({ default: module.TemplateDetailPage })))
 const TemplatesPage = lazy(() => import('./features/product/pages/TemplatesPage').then((module) => ({ default: module.TemplatesPage })))
 const PublicInfoPage = lazy(() => import('./features/product/pages/PublicInfoPage').then((module) => ({ default: module.PublicInfoPage })))
+const AuthPage = lazy(() => import('./features/product/pages/AuthPage').then((module) => ({ default: module.AuthPage })))
+const RequireAccount = lazy(() => import('./features/product/components/RequireAccount').then((module) => ({ default: module.RequireAccount })))
 
 export default function App() {
   return <BrowserRouter><RouteMetadata /><Suspense fallback={<div className="route-loading">Opening ForgeOS…</div>}><Routes>
@@ -22,17 +24,20 @@ export default function App() {
     <Route path="/docs" element={<PublicInfoPage kind="docs" />} />
     <Route path="/privacy" element={<PublicInfoPage kind="privacy" />} />
     <Route path="/terms" element={<PublicInfoPage kind="terms" />} />
-    <Route element={<ProductShell />}>
-      <Route path="/projects" element={<ProjectsPage />} />
-      <Route path="/templates" element={<TemplatesPage />} />
-      <Route path="/runs" element={<RunsPage />} />
-      <Route path="/approvals" element={<ApprovalsPage />} />
-      <Route path="/connections" element={<ConnectionsPage />} />
-      <Route path="/settings" element={<SettingsPage />} />
+    <Route path="/login" element={<AuthPage />} />
+    <Route element={<RequireAccount />}>
+      <Route element={<ProductShell />}>
+        <Route path="/projects" element={<ProjectsPage />} />
+        <Route path="/templates" element={<TemplatesPage />} />
+        <Route path="/runs" element={<RunsPage />} />
+        <Route path="/approvals" element={<ApprovalsPage />} />
+        <Route path="/connections" element={<ConnectionsPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
+      </Route>
+      <Route path="/new/:templateId" element={<CreateAgentPage />} />
+      <Route path="/app/:agentId" element={<AgentBuilderPage />} />
+      <Route path="/app" element={<Navigate to="/projects" replace />} />
     </Route>
-    <Route path="/new/:templateId" element={<CreateAgentPage />} />
-    <Route path="/app/:agentId" element={<AgentBuilderPage />} />
-    <Route path="/app" element={<Navigate to="/projects" replace />} />
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes></Suspense></BrowserRouter>
 }
@@ -40,7 +45,7 @@ export default function App() {
 function RouteMetadata() {
   const { pathname } = useLocation()
   useEffect(() => {
-    const appRoute = ['/projects','/templates','/runs','/approvals','/connections','/settings','/new/','/app/'].some((route) => pathname.startsWith(route))
+    const appRoute = ['/login','/projects','/templates','/runs','/approvals','/connections','/settings','/new/','/app/'].some((route) => pathname.startsWith(route))
     const templateRoute = pathname.startsWith('/agents/')
     document.title = appRoute ? 'ForgeOS — Custom Browser Agents' : templateRoute ? 'Agent Template — ForgeOS by 1forge' : 'ForgeOS by 1forge — Build Custom Browser Agents'
     const robots = document.querySelector<HTMLMetaElement>('meta[name="robots"]')

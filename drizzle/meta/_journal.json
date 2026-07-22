@@ -15,6 +15,13 @@
       "when": 1784737660975,
       "tag": "0001_numerous_crystal",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784739135414,
+      "tag": "0002_smiling_unicorn",
+      "breakpoints": true
     }
   ]
 }

@@ -24,12 +24,19 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     try { body = JSON.parse(rawBody) as T & ApiErrorBody } catch { body = null }
   }
 
+  if (response.status === 401 && !path.startsWith('/api/auth/')) {
+    const next = `${window.location.pathname}${window.location.search}`
+    window.location.assign(`/login?next=${encodeURIComponent(next)}`)
+  }
   if (!response.ok || !body) throw new Error(responseError(response, body, rawBody))
   return body as T
 }
 
 export const productApi = {
-  session: () => request<AccountSession>('/api/account'),
+  session: () => request<AccountSession>('/api/auth/session'),
+  register: (payload: { name: string; email: string; password: string }) => request<AccountSession>('/api/auth/register', { method: 'POST', body: JSON.stringify(payload) }),
+  login: (payload: { email: string; password: string }) => request<AccountSession>('/api/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
+  logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
   agents: () => request<{ agents: StoredAgent[] }>('/api/agents'),
   agent: (id: string) => request<{ agent: StoredAgent }>(`/api/agents/${encodeURIComponent(id)}`),
   createAgent: (payload: { templateId: string; name: string; websiteUrl: string; goal: string; nodes: unknown[]; edges: unknown[] }) => request<{ agent: StoredAgent }>('/api/agents', { method: 'POST', body: JSON.stringify(payload) }),

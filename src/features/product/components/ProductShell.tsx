@@ -16,6 +16,7 @@ const links = [
 export function ProductShell() {
   const [session, setSession] = useState<AccountSession | null>(null)
   useEffect(() => { productApi.session().then(setSession).catch(() => setSession({ authenticated: false, user: null, workspace: null })) }, [])
+  const signOut = async () => { await productApi.logout(); window.location.assign('/login') }
 
   return (
     <div className="product-app-shell">
@@ -37,7 +38,7 @@ export function ProductShell() {
       <div className="product-main-column">
         <header className="product-topbar">
           <div><span className="live-dot" /> Protected workspace</div>
-          <nav><a href="https://studio.1forge.in/" target="_blank" rel="noreferrer">1forge Studio</a><a href="/">ForgeOS home</a><a href="/signout-with-chatgpt?return_to=/"><LogOut size={13} /> Sign out</a></nav>
+          <nav><a href="https://studio.1forge.in/" target="_blank" rel="noreferrer">1forge Studio</a><a href="/">ForgeOS home</a><button onClick={() => void signOut()}><LogOut size={13} /> Sign out</button></nav>
         </header>
         <Outlet context={{ session }} />
       </div>

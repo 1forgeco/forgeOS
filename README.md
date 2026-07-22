@@ -1,35 +1,52 @@
-# React + TypeScript + Vite
+# ForgeOS Agent Studio
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+ForgeOS is 1forge Studio's visual environment for assembling, testing, and eventually deploying custom AI agents. The public landing page remains at `/`; the working agent studio lives at `/app`.
 
-Currently, two official plugins are available:
+The first product slice is a **Service Finder & Booking Agent**. Users can drag capability blocks onto a canvas, connect them, configure each step, simulate a realistic booking request, and see execution travel through the workflow.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Local development
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
-# forgeOSS
-# forgeOS
-# forgeOS
+Useful checks:
+
+```bash
+npm run build
+npm run lint
+```
+
+## Project structure
+
+```text
+src/
+  components/                    Existing landing-page components
+  pages/MarketingPage.tsx        Preserved public landing page
+  features/agent-builder/
+    components/                  Independent builder UI components
+    data/                        Node registry and starter workflow
+    pages/                       Agent Studio route composition
+    styles/                      Product-specific visual system
+    types.ts                     Shared workflow types
+  App.tsx                        Route and metadata boundary
+
+worker/index.js                  Cloudflare-compatible SPA worker
+scripts/                         Repeatable build preparation
+public/                          Static media and social preview
+```
+
+## Extending the node library
+
+Most new capability blocks require only three focused changes:
+
+1. Add the node kind to `src/features/agent-builder/types.ts`.
+2. Add its label, icon, defaults, and configuration fields to `data/nodeRegistry.ts`.
+3. Add it to a starter workflow or expose it through the palette.
+
+The canvas, inspector, persistence, simulation UI, and drag-and-drop behavior are shared automatically.
+
+## Current persistence
+
+This first slice intentionally saves workflow drafts in browser storage. It is suitable for product exploration and demos, not multi-user production data. The next backend milestone should introduce workspaces, versioned workflows, encrypted connections, and durable execution history.

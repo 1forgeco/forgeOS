@@ -1,17 +1,20 @@
 {
-  "name": "automation",
+  "name": "forgeos-agent-studio",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && node scripts/clean-build.mjs && vite build && node scripts/prepare-sites-build.mjs",
     "lint": "oxlint",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@xyflow/react": "^12.11.2",
+    "lucide-react": "^1.25.0",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "react-router-dom": "^7.18.1"
   },
   "devDependencies": {
     "@types/node": "^24.13.2",

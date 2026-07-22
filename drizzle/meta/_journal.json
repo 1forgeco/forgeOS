@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1784734649353,
+      "tag": "0000_friendly_rick_jones",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1784737660975,
+      "tag": "0001_numerous_crystal",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784739135414,
+      "tag": "0002_smiling_unicorn",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1784741531347,
+      "tag": "0003_low_catseye",
+      "breakpoints": true
+    }
+  ]
+}

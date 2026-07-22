@@ -1,35 +1,70 @@
-# React + TypeScript + Vite
+# ForgeOS
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+ForgeOS is 1forge’s product for choosing, customizing, testing, versioning, and deploying browser agents. The marketing site lives at `/`; authenticated product routes include `/projects`, `/templates`, `/runs`, `/approvals`, `/connections`, and `/settings`.
 
-Currently, two official plugins are available:
+## Product model
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Agent templates are shared structured data, not separate hard-coded products.
+- Guided creation converts a user’s website, goal, changing inputs, and approval policy into an editable graph.
+- Agents and immutable deployment versions are stored in D1 under an authenticated workspace.
+- The Chrome extension imports a deployed agent definition and operates only on allowed HTTPS domains.
+- Available, Beta, and Coming soon labels describe actual runtime support.
 
-## React Compiler
+The core workflow remains:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```text
+Start manually → Choose website → Describe goal → Ask for inputs
+               → Browser agent → Ask for approval → Return result
+                                ↘ Let me take over
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
-# forgeOSS
-# forgeOS
-# forgeOS
+## Local development
+
+```bash
+npm install
+npm run dev
+```
+
+`npm run dev` now prepares the local D1 database and starts both services:
+
+- ForgeOS UI: `http://localhost:5173`
+- Local Worker API: `http://localhost:8787`
+
+Vite proxies `/api/*` to the Worker, so registration, sign-in, saved agents, and other account-backed features work from the normal `localhost:5173` URL. Local data is stored under `.wrangler/` and is intentionally excluded from Git.
+
+Validation:
+
+```bash
+npm run db:generate
+npm run build
+npm run lint
+```
+
+If an older frontend-only development process is already running, stop it once and rerun `npm run dev` so the API process and proxy are started too.
+
+## Project structure
+
+```text
+src/
+  pages/MarketingPage.tsx
+  features/product/
+    components/      Product shell, cards, and landing discovery
+    data/            Shared agent-template registry
+    pages/           Projects, templates, creation, runs, approvals, settings
+    styles/          Product UI system
+    api.ts            Typed product API client
+  features/agent-builder/
+    components/      Canvas, test, and deploy surfaces
+    data/            Node registry and base workflow
+    runtime/         Graph compiler and preserved booking template
+
+db/schema.ts         Users, workspaces, agents, versions, runs, approvals, connections
+drizzle/             Deployable D1 migrations
+worker/index.ts      Identity-aware product API and static application worker
+extension/           Manifest V3 browser execution runtime
+public/              Extension package, media, and social preview
+```
+
+## Current browser execution scope
+
+The extension enforces the domain allowlist, opens a normal HTTPS tab, identifies a semantic search field, fills it from run inputs or the goal, and submits the search. Multi-step filtering, sorting, page-state planning, and result verification remain Beta. Login, CAPTCHA, two-factor authentication, payment details, legal acceptance, and protected actions remain user-controlled.

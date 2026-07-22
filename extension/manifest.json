@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "ForgeOS Browser Agent",
+  "version": "0.3.0",
+  "description": "Run ForgeOS workflows in a normal browser tab with visible progress and approval controls.",
+  "permissions": ["activeTab", "sidePanel", "storage", "tabs"],
+  "host_permissions": ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Open ForgeOS"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

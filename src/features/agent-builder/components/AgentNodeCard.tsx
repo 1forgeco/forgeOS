@@ -7,8 +7,8 @@ import type { AgentNode } from '../types'
 export function AgentNodeCard({ data, selected }: NodeProps<AgentNode>) {
   const definition = NODE_REGISTRY[data.kind]
   const Icon = definition.icon
-  const isTrigger = data.kind === 'websiteChat'
-  const isTerminal = data.kind === 'sendConfirmation' || data.kind === 'humanHandoff'
+  const isTrigger = data.kind === 'manualTrigger'
+  const isTerminal = data.kind === 'returnResult' || data.kind === 'humanTakeover'
 
   return (
     <article

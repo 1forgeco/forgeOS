@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ForgeOS Browser Agent</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <main>
+      <header><span>F</span><div><strong>ForgeOS</strong><small>Browser agent</small></div></header>
+      <section id="empty" class="empty">
+        <b>Import an agent</b>
+        <p>Export a workflow from ForgeOS, then select its JSON file here.</p>
+        <label>Choose agent file<input id="file" type="file" accept="application/json,.json" /></label>
+      </section>
+      <section id="agent" class="agent" hidden>
+        <div class="agent-title"><span>Ready</span><h1 id="name"></h1><p id="goal"></p></div>
+        <dl><div><dt>Website</dt><dd id="website"></dd></div><div><dt>Permissions</dt><dd id="actions"></dd></div><div><dt>Approval</dt><dd id="approval"></dd></div></dl>
+        <div id="inputs" class="inputs"></div>
+        <button id="run" class="run">Run agent</button>
+        <button id="replace" class="replace">Import a different agent</button>
+      </section>
+      <section id="activity" class="activity" hidden><div><strong>Live activity</strong><span id="run-state">Running</span></div><ol id="events"></ol></section>
+      <footer>ForgeOS never enters passwords, payment details, CAPTCHA, or two-factor codes.</footer>
+    </main>
+    <script src="sidepanel.js"></script>
+  </body>
+</html>

@@ -1,4 +1,12 @@
-import type { AgentNodeKind } from '../types'
+type BookingNodeKind =
+  | 'websiteChat'
+  | 'collectRequirements'
+  | 'searchCatalog'
+  | 'filterRank'
+  | 'checkAvailability'
+  | 'requestConfirmation'
+  | 'createBooking'
+  | 'sendConfirmation'
 
 export type BookingService = {
   id: string
@@ -34,7 +42,7 @@ export type BookingAgentResponse = {
   reply: string
   session: BookingSession
   quickReplies: string[]
-  activeSteps: AgentNodeKind[]
+  activeSteps: BookingNodeKind[]
   booking?: BookingRecord
 }
 

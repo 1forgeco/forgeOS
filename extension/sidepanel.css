@@ -1,0 +1,19 @@
+:root { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, sans-serif; color: #18191e; background: #f6f7fa; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { min-height: 100vh; padding: 18px; background: radial-gradient(circle at 75% 0, #e8e4ff, transparent 32%), #f6f7fa; }
+header { display: flex; align-items: center; gap: 9px; padding-bottom: 16px; border-bottom: 1px solid #dedfe5; }
+header > span { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; color: white; background: linear-gradient(145deg,#191a20,#41434c); font: italic 700 18px Georgia; }
+header div { display: grid; } header strong { font-size: 13px; } header small { color: #888b96; font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
+.empty, .agent, .activity { margin-top: 16px; padding: 16px; border: 1px solid #dedfe5; border-radius: 16px; background: rgba(255,255,255,.88); box-shadow: 0 14px 38px rgba(35,37,49,.07); }
+.empty { text-align: center; padding-block: 34px; } .empty b { font-size: 16px; } .empty p { color: #747783; font-size: 11px; line-height: 1.5; }
+.empty label, .run { display: block; width: 100%; padding: 11px; border: 0; border-radius: 11px; color: white; background: #695bdd; font-size: 11px; font-weight: 700; cursor: pointer; }
+.empty input { display: none; }
+.agent-title > span { display: inline-block; padding: 4px 7px; border-radius: 99px; color: #347a59; background: #e4f5ec; font-size: 8px; font-weight: 700; text-transform: uppercase; }
+h1 { margin: 11px 0 0; font-size: 22px; letter-spacing: -.04em; } .agent-title p { color: #686b76; font-size: 11px; line-height: 1.5; }
+dl { margin: 16px 0; display: grid; gap: 8px; } dl div { padding: 10px; border-radius: 10px; background: #f4f4f8; } dt { color: #8b8e98; font-size: 8px; font-weight: 700; text-transform: uppercase; } dd { margin: 4px 0 0; font-size: 10px; line-height: 1.45; overflow-wrap: anywhere; }
+.inputs { display: grid; gap: 8px; margin-bottom: 12px; } .inputs label { display: grid; gap: 4px; color: #666975; font-size: 9px; font-weight: 600; } .inputs input { width: 100%; padding: 9px; border: 1px solid #dfe0e6; border-radius: 9px; outline: none; font-size: 10px; }
+.replace { width: 100%; margin-top: 8px; border: 0; color: #757884; background: transparent; font-size: 9px; cursor: pointer; }
+.activity > div { display: flex; justify-content: space-between; } .activity strong { font-size: 11px; } #run-state { color: #6a5bd0; font-size: 9px; }
+ol { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 9px; } li { padding-left: 12px; border-left: 2px solid #7061e2; } li b { display: block; font-size: 10px; } li p { margin: 3px 0 0; color: #777a85; font-size: 9px; line-height: 1.4; } li.error { border-color: #d25e51; } li.takeover { border-color: #e29a45; }
+footer { margin-top: 16px; padding: 0 8px; color: #999ca5; font-size: 8px; line-height: 1.5; text-align: center; }

@@ -1,56 +1,65 @@
-import { Check, Clipboard, Code2, ExternalLink, Globe2, ShieldCheck } from 'lucide-react'
+import { AlertTriangle, Check, Code2, Download, ExternalLink, Puzzle, ShieldCheck } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { compileBrowserWorkflow, downloadWorkflow } from '../runtime/browserWorkflow'
+import type { AgentEdge, AgentNode } from '../types'
 
 type InstallAgentPanelProps = {
+  title: string
+  nodes: AgentNode[]
+  edges: AgentEdge[]
   onOpenTest: () => void
 }
 
-export function InstallAgentPanel({ onOpenTest }: InstallAgentPanelProps) {
-  const [copied, setCopied] = useState(false)
-  const baseUrl = window.location.origin
-  const snippet = useMemo(() => `<script
-  async
-  src="${baseUrl}/forgeos-widget.js"
-  data-agent-id="demo-booking"
-  data-title="Booking concierge"
-  data-accent="#6f63f6"
-></script>`, [baseUrl])
+export function InstallAgentPanel({ title, nodes, edges, onOpenTest }: InstallAgentPanelProps) {
+  const [downloaded, setDownloaded] = useState(false)
+  const compiled = useMemo(() => compileBrowserWorkflow(title, nodes, edges), [title, nodes, edges])
+  const definition = compiled.definition
 
-  const copySnippet = async () => {
-    await navigator.clipboard.writeText(snippet)
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 1800)
+  const exportAgent = () => {
+    if (!definition) return
+    downloadWorkflow(definition)
+    setDownloaded(true)
+    window.setTimeout(() => setDownloaded(false), 1800)
   }
 
   return (
-    <main className="install-agent-view">
+    <main className="install-agent-view deploy-agent-view">
       <section className="install-hero">
-        <span className="view-eyebrow"><Globe2 size={13} /> Website installation</span>
-        <h1>Put this agent on your website.</h1>
-        <p>Copy one small script into your site. It adds a floating Booking Concierge that uses the workflow and agent endpoint you just tested.</p>
+        <span className="view-eyebrow"><Puzzle size={13} /> Browser deployment</span>
+        <h1>Move this workflow into the browser.</h1>
+        <p>ForgeOS exports one versioned agent file. The browser extension reads it, opens the allowed website in a normal tab, shows progress in the side panel, and enforces your approval rules.</p>
       </section>
 
+      <div className="deploy-readiness-card">
+        <div className={`deploy-readiness-icon ${definition ? 'ready' : 'blocked'}`}>{definition ? <Check size={18} /> : <AlertTriangle size={18} />}</div>
+        <div><strong>{definition ? 'Agent definition is ready' : 'Fix the workflow before deploying'}</strong><p>{definition ? `${definition.allowedDomains.length} allowed domain${definition.allowedDomains.length === 1 ? '' : 's'} · ${definition.allowedActions.length} browser capabilities · ${definition.approvalActions.length} approval checks` : compiled.errors[0]}</p></div>
+        <button onClick={onOpenTest}>Run test <ExternalLink size={13} /></button>
+      </div>
+
       <div className="install-grid">
-        <section className="install-code-card">
-          <header><div><Code2 size={16} /><strong>Installation code</strong></div><span>HTML</span></header>
-          <pre><code>{snippet}</code></pre>
-          <button className="copy-code" onClick={() => void copySnippet()}>{copied ? <Check size={14} /> : <Clipboard size={14} />}{copied ? 'Copied' : 'Copy installation code'}</button>
+        <section className="install-code-card deploy-definition-card">
+          <header><div><Code2 size={16} /><strong>Version 1 agent definition</strong></div><span>JSON</span></header>
+          <pre><code>{definition ? JSON.stringify(definition, null, 2) : JSON.stringify({ error: compiled.errors[0] ?? 'Workflow is incomplete' }, null, 2)}</code></pre>
+          <div className="deploy-downloads">
+            <button className="copy-code" onClick={exportAgent} disabled={!definition}>{downloaded ? <Check size={14} /> : <Download size={14} />}{downloaded ? 'Agent downloaded' : 'Download agent file'}</button>
+            <a href="/forgeos-extension.zip" download><Puzzle size={14} /> Download Chrome extension</a>
+          </div>
         </section>
 
         <section className="install-steps-card">
-          <h2>Install in three steps</h2>
+          <h2>Test with the Chrome extension</h2>
           <ol>
-            <li><b>1</b><div><strong>Copy the code</strong><p>Use the button beside the installation snippet.</p></div></li>
-            <li><b>2</b><div><strong>Paste before <code>&lt;/body&gt;</code></strong><p>Add it to the global layout or footer of your website.</p></div></li>
-            <li><b>3</b><div><strong>Open your website</strong><p>The purple chat button appears in the bottom-right corner.</p></div></li>
+            <li><b>1</b><div><strong>Load the ForgeOS extension</strong><p>Download and unzip it, open Chrome Extensions, enable Developer mode, then load the unpacked <code>extension</code> folder.</p></div></li>
+            <li><b>2</b><div><strong>Import this agent</strong><p>Download the JSON file here, then import it from the ForgeOS side panel.</p></div></li>
+            <li><b>3</b><div><strong>Review and run</strong><p>The extension opens the target site. You remain in control of login, CAPTCHA, payments, and every protected action.</p></div></li>
           </ol>
         </section>
       </div>
 
-      <section className="install-status-card">
-        <div><span><ShieldCheck size={18} /></span><div><strong>Safe test configuration</strong><p>The widget can only use the demo booking agent. It cannot access the rest of the visitor’s site or accounts.</p></div></div>
-        <div><span><Globe2 size={18} /></span><div><strong>Public access required</strong><p>External websites cannot load an owner-only deployment. Make ForgeOS public when you are ready to test the widget on another domain.</p></div></div>
-        <button onClick={onOpenTest}>Test inside ForgeOS first <ExternalLink size={13} /></button>
+      <section className="install-status-card deploy-status-card">
+        <div><span><ShieldCheck size={18} /></span><div><strong>Domain restricted</strong><p>The exported agent can act only on the domains configured in the website node.</p></div></div>
+        <div><span><Puzzle size={18} /></span><div><strong>Hybrid execution</strong><p>The agent chooses among approved browser capabilities. You do not need a separate node for every click or filter.</p></div></div>
+        <button onClick={onOpenTest}>Test the definition <ExternalLink size={13} /></button>
       </section>
     </main>
   )

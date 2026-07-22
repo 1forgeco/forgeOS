@@ -31,20 +31,20 @@ export function NodePalette({ onAdd, onOpenTest, onOpenInstall }: NodePalettePro
   return (
     <aside className="node-palette" aria-label="Workflow blocks">
       <section className="active-agent-section">
-        <div className="active-agent-label"><span>Your agents</span><b>1 active</b></div>
+        <div className="active-agent-label"><span>Your draft</span><b>Custom</b></div>
         <button className="active-agent-card" type="button">
           <span className="active-agent-avatar"><Bot size={17} /></span>
-          <span><strong>Booking concierge</strong><small><Radio size={10} /> Running now</small></span>
+          <span><strong>Browser agent</strong><small><Radio size={10} /> Ready to configure</small></span>
           <i />
         </button>
       </section>
       <section className="setup-guide">
-        <div className="setup-guide-heading"><span>Get this agent ready</span><b>2 of 4</b></div>
+        <div className="setup-guide-heading"><span>Build and deploy</span><b>2 of 4</b></div>
         <div className="setup-progress"><i /></div>
-        <button type="button"><Check size={12} /><span><strong>Starting workflow added</strong><small>Your booking steps are connected.</small></span></button>
-        <button type="button"><Check size={12} /><span><strong>Example services added</strong><small>Three test services are ready.</small></span></button>
-        <button type="button" onClick={onOpenTest}><Circle size={11} /><span><strong>Test a conversation</strong><small>See how the agent responds.</small></span><ArrowRight size={11} /></button>
-        <button type="button" onClick={onOpenInstall}><Circle size={11} /><span><strong>Add it to your website</strong><small>Copy the installation code.</small></span><ArrowRight size={11} /></button>
+        <button type="button"><Check size={12} /><span><strong>Core workflow added</strong><small>Website, goal and safety are connected.</small></span></button>
+        <button type="button"><Check size={12} /><span><strong>Browser tools added</strong><small>Search, click, type and extract are allowed.</small></span></button>
+        <button type="button" onClick={onOpenTest}><Circle size={11} /><span><strong>Test the workflow</strong><small>Validate inputs and execution order.</small></span><ArrowRight size={11} /></button>
+        <button type="button" onClick={onOpenInstall}><Circle size={11} /><span><strong>Deploy the agent</strong><small>Export it for the browser extension.</small></span><ArrowRight size={11} /></button>
       </section>
       <div className="palette-heading">
         <span>Add another step</span>

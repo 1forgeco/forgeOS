@@ -1,162 +1,132 @@
-import { ArrowRight, Bot, Check, RotateCcw, Send, Sparkles, UserRound } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
+import { ArrowUpRight, Bot, Check, CircleStop, Globe2, LoaderCircle, Play, RotateCcw, ShieldCheck, UserRound } from 'lucide-react'
+import { useMemo, useRef, useState, type CSSProperties } from 'react'
 import { NODE_REGISTRY } from '../data/nodeRegistry'
-import {
-  EMPTY_BOOKING_SESSION,
-  runBookingTurn,
-  type BookingAgentResponse,
-  type BookingSession,
-} from '../runtime/bookingAgent'
-import type { AgentNodeKind } from '../types'
-
-type ChatMessage = { id: string; role: 'agent' | 'visitor'; text: string }
+import { buildRunDetails, compileBrowserWorkflow } from '../runtime/browserWorkflow'
+import type { AgentEdge, AgentNode, AgentNodeKind } from '../types'
 
 type TestAgentPanelProps = {
+  title: string
+  nodes: AgentNode[]
+  edges: AgentEdge[]
   onActivity: (steps: AgentNodeKind[]) => void
 }
 
-const TEST_PIPELINE: AgentNodeKind[] = [
-  'websiteChat',
-  'collectRequirements',
-  'searchCatalog',
-  'filterRank',
-  'checkAvailability',
-  'requestConfirmation',
-  'createBooking',
-  'sendConfirmation',
-]
+type BrowserEvent = { id: string; title: string; detail: string; state: 'running' | 'done' }
 
-export function TestAgentPanel({ onActivity }: TestAgentPanelProps) {
-  const opening = useMemo(() => runBookingTurn('', EMPTY_BOOKING_SESSION), [])
-  const [messages, setMessages] = useState<ChatMessage[]>([{ id: 'welcome', role: 'agent', text: opening.reply }])
-  const [session, setSession] = useState<BookingSession>(opening.session)
-  const [sessionId, setSessionId] = useState<string>(() => crypto.randomUUID())
-  const [quickReplies, setQuickReplies] = useState(opening.quickReplies)
-  const [activeSteps, setActiveSteps] = useState<AgentNodeKind[]>(opening.activeSteps)
-  const [value, setValue] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [liveMode, setLiveMode] = useState<'connected' | 'browser-preview'>('connected')
-  const scrollRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
-  }, [messages, quickReplies, busy])
+export function TestAgentPanel({ title, nodes, edges, onActivity }: TestAgentPanelProps) {
+  const compiled = useMemo(() => compileBrowserWorkflow(title, nodes, edges), [title, nodes, edges])
+  const definition = compiled.definition
+  const [inputs, setInputs] = useState<Record<string, string>>({})
+  const [events, setEvents] = useState<BrowserEvent[]>([])
+  const [running, setRunning] = useState(false)
+  const [runComplete, setRunComplete] = useState(false)
+  const stopRequested = useRef(false)
 
   const reset = () => {
-    const start = runBookingTurn('', EMPTY_BOOKING_SESSION)
-    setMessages([{ id: `welcome-${Date.now()}`, role: 'agent', text: start.reply }])
-    setSession(start.session)
-    setSessionId(crypto.randomUUID())
-    setQuickReplies(start.quickReplies)
-    setActiveSteps(start.activeSteps)
-    onActivity(start.activeSteps)
+    stopRequested.current = true
+    setEvents([])
+    setRunning(false)
+    setRunComplete(false)
+    onActivity([])
   }
 
-  const requestAgent = async (message: string): Promise<BookingAgentResponse> => {
-    try {
-      const response = await fetch('/api/agents/demo-booking/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, session, sessionId }),
-      })
-      if (!response.headers.get('content-type')?.includes('application/json')) throw new Error('Preview API is not available locally')
-      const result = await response.json() as BookingAgentResponse & { error?: string; sessionId?: string }
-      if (!response.ok) throw new Error(result.error ?? 'The agent could not respond')
-      if (result.sessionId) setSessionId(result.sessionId)
-      setLiveMode('connected')
-      return result
-    } catch {
-      setLiveMode('browser-preview')
-      return runBookingTurn(message, session)
+  const run = async () => {
+    if (!definition || running) return
+    stopRequested.current = false
+    setRunning(true)
+    setRunComplete(false)
+    setEvents([])
+    const details = buildRunDetails(definition, inputs)
+    const primary = compiled.orderedNodes.filter((node) => node.data.kind !== 'humanTakeover')
+
+    for (const node of primary) {
+      if (stopRequested.current) break
+      onActivity([node.data.kind])
+      const id = `${node.id}-${Date.now()}`
+      setEvents((current) => [...current, { id, title: node.data.label, detail: 'Checking this step…', state: 'running' }])
+      await new Promise((resolve) => window.setTimeout(resolve, 620))
+      if (stopRequested.current) break
+      setEvents((current) => current.map((event) => event.id === id ? { ...event, detail: details[node.data.kind], state: 'done' } : event))
     }
+
+    if (!stopRequested.current) {
+      setRunComplete(true)
+      onActivity(primary.map((node) => node.data.kind))
+    }
+    setRunning(false)
   }
 
-  const sendMessage = async (message: string) => {
-    const clean = message.trim()
-    if (!clean || busy) return
-    setMessages((current) => [...current, { id: `visitor-${Date.now()}`, role: 'visitor', text: clean }])
-    setValue('')
-    setQuickReplies([])
-    setBusy(true)
-    const result = await requestAgent(clean)
-    setSession(result.session)
-    setQuickReplies(result.quickReplies)
-    setActiveSteps(result.activeSteps)
-    onActivity(result.activeSteps)
-    setMessages((current) => [...current, { id: `agent-${Date.now()}`, role: 'agent', text: result.reply }])
-    setBusy(false)
+  const openTarget = () => {
+    if (definition) window.open(definition.websiteUrl, '_blank', 'noopener,noreferrer')
   }
 
-  const submit = (event: FormEvent) => {
-    event.preventDefault()
-    void sendMessage(value)
-  }
+  const orderedKinds = compiled.orderedNodes.filter((node) => node.data.kind !== 'humanTakeover').map((node) => node.data.kind)
 
   return (
-    <main className="test-agent-view">
-      <section className="test-intro">
+    <main className="browser-test-view">
+      <section className="test-intro browser-test-intro">
         <div>
-          <span className="view-eyebrow"><Sparkles size={13} /> Real conversation test</span>
-          <h1>Talk to your agent like a visitor would.</h1>
-          <p>Try different requests, vague answers, and booking details. The live path below shows which parts of your workflow handled each message.</p>
+          <span className="view-eyebrow"><Bot size={13} /> Browser run test</span>
+          <h1>Watch the workflow prepare a real browser run.</h1>
+          <p>This verifies the saved website, goal, inputs, permissions, approval policy, and completion rule. The Chrome extension performs the page clicks in a normal tab.</p>
         </div>
-        <button onClick={reset}><RotateCcw size={14} /> Start a fresh test</button>
+        <button onClick={reset}><RotateCcw size={14} /> Reset test</button>
       </section>
 
-      <section className="live-pipeline" aria-label="Agent execution path">
-        {TEST_PIPELINE.map((kind, index) => {
-          const definition = NODE_REGISTRY[kind]
-          const Icon = definition.icon
-          const active = activeSteps.includes(kind)
+      <section className="live-pipeline browser-live-pipeline" aria-label="Agent execution path">
+        {orderedKinds.map((kind, index) => {
+          const definitionForKind = NODE_REGISTRY[kind]
+          const Icon = definitionForKind.icon
+          const active = nodes.some((node) => node.data.kind === kind && node.data.status !== 'idle')
           return (
-            <div className={`live-pipeline-step${active ? ' active' : ''}`} key={kind}>
-              <span style={{ '--step-color': definition.color } as CSSProperties}><Icon size={15} /></span>
-              <small>{definition.label}</small>
-              {index < TEST_PIPELINE.length - 1 && <i><b /></i>}
+            <div className={`live-pipeline-step${active ? ' active' : ''}`} key={`${kind}-${index}`}>
+              <span style={{ '--step-color': definitionForKind.color } as CSSProperties}><Icon size={15} /></span>
+              <small>{definitionForKind.label}</small>
+              {index < orderedKinds.length - 1 && <i><b /></i>}
             </div>
           )
         })}
       </section>
 
-      <div className="test-workspace">
-        <section className="chat-preview-card">
-          <header>
-            <span className="chat-agent-avatar"><Bot size={19} /></span>
-            <div><strong>Booking concierge</strong><small><i /> Online · test mode</small></div>
-            <span className={`runtime-badge ${liveMode}`}>{liveMode === 'connected' ? 'Saving test runs' : 'Local preview'}</span>
+      <div className="browser-test-workspace">
+        <section className="browser-window-card">
+          <header className="browser-chrome">
+            <div className="browser-dots"><i /><i /><i /></div>
+            <div className="browser-address"><ShieldCheck size={12} /><span>{definition?.websiteUrl || 'Add a valid website to begin'}</span></div>
+            <button onClick={openTarget} disabled={!definition} aria-label="Open target website"><ArrowUpRight size={14} /></button>
           </header>
-          <div className="chat-messages" ref={scrollRef}>
-            {messages.map((message) => (
-              <div className={`chat-message ${message.role}`} key={message.id}>
-                <span>{message.role === 'agent' ? <Bot size={13} /> : <UserRound size={13} />}</span>
-                <p>{message.text}</p>
+          <div className="browser-surface">
+            <div className="browser-page-preview">
+              <span className="browser-site-mark"><Globe2 size={22} /></span>
+              <p>Target website</p>
+              <h2>{definition ? new URL(definition.websiteUrl).hostname : 'Workflow needs attention'}</h2>
+              <small>{definition ? 'The extension opens this site in a normal browser tab. ForgeOS does not embed or imitate it.' : compiled.errors[0]}</small>
+              {definition && <button onClick={openTarget}>Open site safely <ArrowUpRight size={13} /></button>}
+            </div>
+            <aside className="browser-side-panel">
+              <div className="side-panel-agent"><span><Bot size={17} /></span><div><strong>{title}</strong><small>{running ? 'Running test…' : runComplete ? 'Test passed' : 'Ready to test'}</small></div></div>
+              <div className="side-panel-goal"><span>Goal</span><p>{definition?.goal || 'Complete the missing builder settings.'}</p></div>
+              {definition && definition.inputs.length > 0 && (
+                <div className="side-panel-inputs">
+                  <span>Inputs for this run</span>
+                  {definition.inputs.map((field) => <label key={field}><small>{field}</small><input value={inputs[field] ?? ''} onChange={(event) => setInputs((current) => ({ ...current, [field]: event.target.value }))} placeholder={`Enter ${field}`} /></label>)}
+                </div>
+              )}
+              <div className="side-panel-actions">
+                {running ? <button className="stop-run" onClick={reset}><CircleStop size={14} /> Stop safely</button> : <button className="start-run" onClick={() => void run()} disabled={!definition}><Play size={14} fill="currentColor" /> Test this flow</button>}
               </div>
-            ))}
-            {busy && <div className="chat-message agent"><span><Bot size={13} /></span><p className="agent-thinking">Checking the next step<span>•••</span></p></div>}
-            {quickReplies.length > 0 && !busy && (
-              <div className="chat-quick-replies">
-                {quickReplies.map((reply) => <button onClick={() => void sendMessage(reply)} key={reply}>{reply}<ArrowRight size={11} /></button>)}
-              </div>
-            )}
+            </aside>
           </div>
-          <form className="chat-composer" onSubmit={submit}>
-            <input value={value} onChange={(event) => setValue(event.target.value)} placeholder="Example: I need help automating my operations" maxLength={1_000} aria-label="Message your agent" />
-            <button disabled={busy || !value.trim()} aria-label="Send message"><Send size={15} /></button>
-          </form>
         </section>
 
-        <aside className="test-guide-card">
-          <span className="view-eyebrow">What to test</span>
-          <h2>Try these realistic situations</h2>
-          <div className="test-prompts">
-            {[
-              ['Clear request', 'I need an automation audit next week.'],
-              ['Needs guidance', 'I am not sure which service I need.'],
-              ['Different request', 'I want to redesign my website.'],
-              ['Missing details', 'Book something for Tuesday.'],
-            ].map(([label, prompt]) => <button onClick={() => void sendMessage(prompt)} key={label}><span><Check size={12} /></span><div><strong>{label}</strong><small>{prompt}</small></div></button>)}
+        <aside className="browser-run-log">
+          <header><div><strong>Execution trace</strong><small>{events.length ? `${events.filter((event) => event.state === 'done').length} checks passed` : 'Nothing has run yet'}</small></div>{runComplete && <span><Check size={12} /> Ready</span>}</header>
+          {!definition && <div className="workflow-errors">{compiled.errors.map((error) => <p key={error}>{error}</p>)}</div>}
+          {definition && events.length === 0 && <div className="empty-trace"><Bot size={22} /><strong>Run a safe dry test</strong><p>ForgeOS will validate every part of the graph without clicking the external website.</p></div>}
+          <div className="browser-event-list">
+            {events.map((event) => <div className={`browser-event ${event.state}`} key={event.id}><span>{event.state === 'running' ? <LoaderCircle size={13} /> : <Check size={13} />}</span><div><strong>{event.title}</strong><p>{event.detail}</p></div></div>)}
           </div>
-          <div className="test-privacy-note"><strong>This test now uses the real agent endpoint.</strong><p>Confirmed booking requests are stored so the workflow can be verified. Use test contact details until authentication is added.</p></div>
+          <div className="browser-test-truth"><UserRound size={14} /><p><strong>Browser control is deliberately separate.</strong> Install the ForgeOS extension to let a deployed agent inspect and act on external tabs. This web test never claims to control a page it cannot access.</p></div>
         </aside>
       </div>
     </main>

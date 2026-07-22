@@ -33,10 +33,11 @@ import { NodePalette } from '../components/NodePalette'
 import { RunPanel } from '../components/RunPanel'
 import { TestAgentPanel } from '../components/TestAgentPanel'
 import { DEFAULT_EDGES, DEFAULT_NODES, createPaletteNode } from '../data/defaultWorkflow'
+import { buildRunDetails, compileBrowserWorkflow, getExecutionOrder } from '../runtime/browserWorkflow'
 import type { AgentEdge, AgentNode, AgentNodeData, AgentNodeKind, RunLog } from '../types'
 import '../styles/agent-builder.css'
 
-const STORAGE_KEY = 'forgeos.booking-agent.v2'
+const STORAGE_KEY = 'forgeos.browser-agent.v1'
 
 type StudioView = 'build' | 'test' | 'install'
 
@@ -55,44 +56,11 @@ function loadWorkflow(): SavedWorkflow {
     // A fresh template is safer than blocking the studio when local storage is unavailable.
   }
   return {
-    title: 'Service Finder & Booking Agent',
+    title: 'Product Research Agent',
     ready: false,
     nodes: DEFAULT_NODES,
     edges: DEFAULT_EDGES,
   }
-}
-
-function runDetail(kind: AgentNodeKind) {
-  const details: Record<AgentNodeKind, string> = {
-    websiteChat: 'Received “I need a strategy consultation next week.”',
-    collectRequirements: 'Understood the service, preferred date, location, and budget.',
-    searchCatalog: 'Found matching services in the approved service list.',
-    filterRank: 'Selected the strongest options using your rules.',
-    checkAvailability: 'Found open times on Tuesday and Thursday.',
-    requestConfirmation: 'The visitor confirmed Thursday at 4:00 PM.',
-    createBooking: 'Saved the booking request with the visitor’s details.',
-    sendConfirmation: 'Prepared the confirmation and reference number.',
-    humanHandoff: 'Prepared a handoff with the complete conversation.',
-  }
-  return details[kind]
-}
-
-function getPrimaryExecutionOrder(nodes: AgentNode[], edges: AgentEdge[]) {
-  const primaryEdges = edges.filter((edge) => edge.data?.path !== 'fallback')
-  const incoming = new Set(primaryEdges.map((edge) => edge.target))
-  const queue = nodes.filter((node) => !incoming.has(node.id)).map((node) => node.id)
-  const visited = new Set<string>()
-  const ordered: AgentNode[] = []
-
-  while (queue.length > 0) {
-    const id = queue.shift()
-    if (!id || visited.has(id)) continue
-    visited.add(id)
-    const node = nodes.find((item) => item.id === id)
-    if (node) ordered.push(node)
-    primaryEdges.filter((edge) => edge.source === id).forEach((edge) => queue.push(edge.target))
-  }
-  return ordered
 }
 
 const nodeTypes = { agentNode: AgentNodeCard }
@@ -121,7 +89,8 @@ function AgentBuilder() {
   const { screenToFlowPosition, fitView } = useReactFlow<AgentNode, AgentEdge>()
 
   const selectedNode = nodes.find((node) => node.id === selectedNodeId) ?? null
-  const healthy = nodes.some((node) => node.data.kind === 'websiteChat') && nodes.some((node) => node.data.kind === 'createBooking') && edges.length > 0
+  const compiled = useMemo(() => compileBrowserWorkflow(title, nodes, edges), [title, nodes, edges])
+  const healthy = Boolean(compiled.definition)
 
   const visibleEdges = useMemo(() => edges.map((edge) => {
     const source = nodes.find((node) => node.id === edge.source)
@@ -184,7 +153,8 @@ function AgentBuilder() {
     setReady(false)
     setLogs([])
     setShowRun(false)
-    setNotice('Starting workflow restored')
+    setTitle('Product Research Agent')
+    setNotice('Custom browser workflow restored')
     window.setTimeout(() => void fitView({ padding: 0.16, duration: 500 }), 50)
   }
 
@@ -194,7 +164,8 @@ function AgentBuilder() {
     setShowRun(true)
     setLogs([])
     setNodes((current) => current.map((node) => ({ ...node, data: { ...node.data, status: 'idle' } })))
-    const order = getPrimaryExecutionOrder(nodes, edges)
+    const order = getExecutionOrder(nodes, edges).filter((node) => node.data.kind !== 'humanTakeover')
+    const details = compiled.definition ? buildRunDetails(compiled.definition, {}) : null
 
     for (const node of order) {
       setNodes((current) => current.map((item) => item.id === node.id ? { ...item, data: { ...item.data, status: 'running' } } : item))
@@ -209,10 +180,10 @@ function AgentBuilder() {
       }])
       await new Promise((resolve) => window.setTimeout(resolve, 480))
       setNodes((current) => current.map((item) => item.id === node.id ? { ...item, data: { ...item.data, status: 'success' } } : item))
-      setLogs((current) => current.map((log) => log.id === logId ? { ...log, detail: runDetail(node.data.kind), status: 'success' } : log))
+      setLogs((current) => current.map((log) => log.id === logId ? { ...log, detail: details?.[node.data.kind] ?? 'Step completed.', status: 'success' } : log))
     }
     setRunning(false)
-    setNotice('Example completed successfully')
+    setNotice('Workflow dry run completed')
   }
 
   const showConversationActivity = (steps: AgentNodeKind[]) => {
@@ -225,11 +196,11 @@ function AgentBuilder() {
 
   const markReady = () => {
     if (!healthy) {
-      setNotice('Connect the website chat to a booking step first')
+      setNotice(compiled.errors[0] ?? 'Connect all required steps first')
       return
     }
     setReady(true)
-    setNotice('Agent marked ready to install')
+    setNotice('Agent marked ready to deploy')
   }
 
   return (
@@ -248,13 +219,13 @@ function AgentBuilder() {
         <nav className="studio-view-tabs" aria-label="Agent setup sections">
           <button className={view === 'build' ? 'active' : ''} onClick={() => setView('build')}><Workflow size={13} /> Build</button>
           <button className={view === 'test' ? 'active' : ''} onClick={() => setView('test')}><MessageSquareText size={13} /> Test</button>
-          <button className={view === 'install' ? 'active' : ''} onClick={() => setView('install')}><Code2 size={13} /> Install</button>
+          <button className={view === 'install' ? 'active' : ''} onClick={() => setView('install')}><Code2 size={13} /> Deploy</button>
         </nav>
 
         <div className="studio-actions">
           <div className="save-state"><Cloud size={13} /><span>Draft saved</span></div>
-          {view === 'build' && <button className="secondary-action" onClick={simulateAgent} disabled={running || !healthy}><Play size={14} fill="currentColor" /> {running ? 'Running…' : 'Run example'}</button>}
-          <button className={`publish-action${ready ? ' published' : ''}`} onClick={ready ? () => setView('install') : markReady}>{ready ? <Check size={14} /> : <Save size={14} />} {ready ? 'Ready to install' : 'Mark ready'}</button>
+          {view === 'build' && <button className="secondary-action" onClick={simulateAgent} disabled={running || !healthy}><Play size={14} fill="currentColor" /> {running ? 'Running…' : 'Dry run'}</button>}
+          <button className={`publish-action${ready ? ' published' : ''}`} onClick={ready ? () => setView('install') : markReady}>{ready ? <Check size={14} /> : <Save size={14} />} {ready ? 'Ready to deploy' : 'Validate agent'}</button>
         </div>
       </header>
 
@@ -263,12 +234,12 @@ function AgentBuilder() {
           <NodePalette onAdd={addNode} onOpenTest={() => setView('test')} onOpenInstall={() => setView('install')} />
           <main className="workflow-stage" onDrop={onDrop} onDragOver={(event) => event.preventDefault()}>
             <div className="canvas-context">
-              <div className="template-pill"><Sparkles size={13} /><span>Service Finder & Booking</span><b>Starting workflow</b></div>
-              <button onClick={() => void simulateAgent()}><Play size={12} /> Show me how it runs</button>
+              <div className="template-pill"><Sparkles size={13} /><span>Custom browser agent</span><b>Core workflow</b></div>
+              <button onClick={() => void simulateAgent()}><Play size={12} /> Preview the path</button>
               <button onClick={resetTemplate}><RotateCcw size={12} /> Start over</button>
             </div>
-            <div className="canvas-guide"><b>1</b><span>Click a card</span><i /><b>2</b><span>Change its instructions on the right</span><i /><b>3</b><span>Use Test when you are ready</span></div>
-            <div className="canvas-health"><span className={healthy ? 'healthy' : ''} /><div><strong>{healthy ? 'Agent steps are connected' : 'A step is disconnected'}</strong><small>{nodes.length} steps · {edges.length} connections</small></div></div>
+            <div className="canvas-guide"><b>1</b><span>Choose the website</span><i /><b>2</b><span>Describe the outcome</span><i /><b>3</b><span>Set permissions and test</span></div>
+            <div className="canvas-health"><span className={healthy ? 'healthy' : ''} /><div><strong>{healthy ? 'Workflow is executable' : compiled.errors[0] ?? 'A step is disconnected'}</strong><small>{nodes.length} steps · {edges.length} connections</small></div></div>
             <ReactFlow<AgentNode, AgentEdge>
               nodes={nodes}
               edges={visibleEdges}
@@ -297,8 +268,8 @@ function AgentBuilder() {
         </div>
       )}
 
-      {view === 'test' && <TestAgentPanel onActivity={showConversationActivity} />}
-      {view === 'install' && <InstallAgentPanel onOpenTest={() => setView('test')} />}
+      {view === 'test' && <TestAgentPanel title={title} nodes={nodes} edges={edges} onActivity={showConversationActivity} />}
+      {view === 'install' && <InstallAgentPanel title={title} nodes={nodes} edges={edges} onOpenTest={() => setView('test')} />}
 
       {notice && <div className="studio-notice"><Check size={14} />{notice}</div>}
       <div className="studio-ambient studio-ambient-one" />

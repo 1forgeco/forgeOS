@@ -31,26 +31,24 @@ function createEdge(source: string, target: string, path: 'primary' | 'fallback'
 }
 
 export const DEFAULT_NODES: AgentNode[] = [
-  createNode('chat', 'websiteChat', 0, 145),
-  createNode('requirements', 'collectRequirements', 290, 145),
-  createNode('catalog', 'searchCatalog', 580, 30),
-  createNode('rank', 'filterRank', 870, 30),
-  createNode('availability', 'checkAvailability', 1160, 30),
-  createNode('confirm', 'requestConfirmation', 1450, 30),
-  createNode('booking', 'createBooking', 1740, 30),
-  createNode('email', 'sendConfirmation', 2030, 30),
-  createNode('handoff', 'humanHandoff', 1160, 300),
+  createNode('start', 'manualTrigger', 0, 125),
+  createNode('website', 'targetWebsite', 290, 125),
+  createNode('goal', 'taskGoal', 580, 125),
+  createNode('inputs', 'requiredInputs', 870, 125),
+  createNode('agent', 'browserAgent', 1160, 125),
+  createNode('approval', 'approvalGate', 1450, 20),
+  createNode('result', 'returnResult', 1740, 20),
+  createNode('takeover', 'humanTakeover', 1450, 285),
 ]
 
 export const DEFAULT_EDGES: AgentEdge[] = [
-  createEdge('chat', 'requirements'),
-  createEdge('requirements', 'catalog'),
-  createEdge('catalog', 'rank'),
-  createEdge('rank', 'availability'),
-  createEdge('availability', 'confirm'),
-  createEdge('confirm', 'booking'),
-  createEdge('booking', 'email'),
-  createEdge('rank', 'handoff', 'fallback'),
+  createEdge('start', 'website'),
+  createEdge('website', 'goal'),
+  createEdge('goal', 'inputs'),
+  createEdge('inputs', 'agent'),
+  createEdge('agent', 'approval'),
+  createEdge('approval', 'result'),
+  createEdge('agent', 'takeover', 'fallback'),
 ]
 
 export function createPaletteNode(kind: AgentNodeKind, x: number, y: number): AgentNode {

@@ -1,8 +1,16 @@
 # ForgeOS Agent Studio
 
-ForgeOS is 1forge Studio's visual environment for assembling, testing, and eventually deploying custom AI agents. The public landing page remains at `/`; the working agent studio lives at `/app`.
+ForgeOS is 1forge Studio’s visual environment for creating, testing, and deploying custom browser agents. The preserved marketing page remains at `/`; the working studio is at `/app`.
 
-The first product slice is a **Service Finder & Booking Agent**. Users can drag clear business steps onto a canvas, connect them, configure each step, hold a complete test conversation, and install the agent on a website with one script tag.
+The default product workflow is intentionally general:
+
+```text
+Start manually → Choose website → Describe goal → Ask for inputs
+               → Browser agent → Ask for approval → Return result
+                                ↘ Let me take over
+```
+
+Users configure outcomes, permissions, safeguards, and outputs instead of manually creating a node for every possible click. The browser agent chooses among reusable capabilities such as search, click, type, select, filter, sort, scroll, and extract.
 
 ## Local development
 
@@ -25,30 +33,32 @@ src/
   components/                    Existing landing-page components
   pages/MarketingPage.tsx        Preserved public landing page
   features/agent-builder/
-    components/                  Independent builder UI components
+    components/                  Independent builder, test, and deploy UI
     data/                        Node registry and starter workflow
     pages/                       Agent Studio route composition
+    runtime/browserWorkflow.ts   Graph validation and compiled agent definition
+    runtime/bookingAgent.ts      Preserved booking-template runtime
     styles/                      Product-specific visual system
-    types.ts                     Shared workflow types
-  App.tsx                        Route and metadata boundary
+    types.ts                     Shared workflow and deployment types
 
-worker/index.ts                  Agent API and Cloudflare-compatible SPA worker
-scripts/                         Repeatable build preparation
-public/                          Static media and social preview
+extension/                       Manifest V3 Chrome execution runtime
+worker/index.ts                  Cloudflare-compatible API and SPA worker
+db/ and drizzle/                 Existing booking-template persistence
+public/                          Static media, widget, and social preview
 ```
 
-## Extending the node library
+## Testing a custom browser agent
 
-Most new capability blocks require only three focused changes:
+1. Open `/app` and edit the **Choose website**, **Describe the goal**, **Ask for inputs**, **Browser agent**, and **Ask for approval** nodes.
+2. Use **Test** to validate the actual saved graph and its compiled settings.
+3. Use **Deploy** to download the versioned agent JSON file.
+4. Download the Chrome extension ZIP from Deploy (or use the repository’s `extension` directory), unzip it, open `chrome://extensions`, enable Developer mode, and choose **Load unpacked**.
+5. Open the ForgeOS side panel, import the JSON file, provide run inputs, and press **Run agent**.
 
-1. Add the node kind to `src/features/agent-builder/types.ts`.
-2. Add its label, icon, defaults, and configuration fields to `data/nodeRegistry.ts`.
-3. Add it to a starter workflow or expose it through the palette.
+The first extension runtime enforces the domain allowlist, opens a normal HTTPS tab, identifies a semantic search field, fills it, and submits a search. It asks for user takeover when a reliable control cannot be found. Login, CAPTCHA, two-factor authentication, payment details, and protected actions remain human-controlled.
 
-The canvas, inspector, persistence, simulation UI, and drag-and-drop behavior are shared automatically.
+## Runtime boundary
 
-## Agent runtime and persistence
+The graph compiler is the contract between the visual builder and every runtime. It produces a stable definition containing the website allowlist, goal, changing inputs, permitted browser capabilities, approval policy, step limit, completion rule, and fallback instructions.
 
-Workflow drafts remain device-local while the product is still single-user. Test conversations and confirmed booking requests use the deployed agent endpoint and D1 database. The embeddable widget is served from `public/forgeos-widget.js` and calls the same runtime used by the in-product Test screen.
-
-The current agent saves a booking **request** using example 1forge services and availability. It does not yet create a Google Calendar event or send email. Those connectors should be added after workspace authentication and encrypted connection storage.
+Multi-step arbitrary browsing still needs a page-state planner and verification loop. The extension intentionally reports its current search-only execution scope instead of pretending that the website preview is being controlled by the web application.

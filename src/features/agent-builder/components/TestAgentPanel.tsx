@@ -2,9 +2,11 @@ import { ArrowUpRight, Bot, Check, CircleStop, Globe2, LoaderCircle, Play, Rotat
 import { useMemo, useRef, useState, type CSSProperties } from 'react'
 import { NODE_REGISTRY } from '../data/nodeRegistry'
 import { buildRunDetails, compileBrowserWorkflow } from '../runtime/browserWorkflow'
+import { productApi } from '../../product/api'
 import type { AgentEdge, AgentNode, AgentNodeKind } from '../types'
 
 type TestAgentPanelProps = {
+  agentId: string
   title: string
   nodes: AgentNode[]
   edges: AgentEdge[]
@@ -13,7 +15,7 @@ type TestAgentPanelProps = {
 
 type BrowserEvent = { id: string; title: string; detail: string; state: 'running' | 'done' }
 
-export function TestAgentPanel({ title, nodes, edges, onActivity }: TestAgentPanelProps) {
+export function TestAgentPanel({ agentId, title, nodes, edges, onActivity }: TestAgentPanelProps) {
   const compiled = useMemo(() => compileBrowserWorkflow(title, nodes, edges), [title, nodes, edges])
   const definition = compiled.definition
   const [inputs, setInputs] = useState<Record<string, string>>({})
@@ -52,6 +54,7 @@ export function TestAgentPanel({ title, nodes, edges, onActivity }: TestAgentPan
     if (!stopRequested.current) {
       setRunComplete(true)
       onActivity(primary.map((node) => node.data.kind))
+      if (agentId) void productApi.recordRun(agentId, { status: 'completed', goal: definition.goal, result: 'Workflow validation completed successfully.' })
     }
     setRunning(false)
   }

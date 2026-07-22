@@ -1,1 +1,2 @@
 html, body, #root { min-height:100%; }
+.route-loading { min-height:100vh;display:grid;place-items:center;color:#77727f;background:#f8f8fb;font:600 12px -apple-system,BlinkMacSystemFont,"SF Pro Text",Arial,sans-serif; }

@@ -4,6 +4,7 @@ import { ArrowUpRight, CheckIcon, SparkIcon } from '../components/Icons'
 import { Integrations } from '../components/Integrations'
 import { PlatformShowcase } from '../components/PlatformShowcase'
 import { SystemCards } from '../components/SystemCards'
+import { LandingAgentCarousel } from '../features/product/components/LandingAgentCarousel'
 import '../App.css'
 
 const capabilities = [
@@ -67,7 +68,7 @@ export function MarketingPage() {
           </h1>
           <p className="hero-intro">We design practical AI agents and automations around the way your business already works — not around the latest buzzword.</p>
           <div className="hero-actions">
-            <a className="button button-dark" href="/app">Get started <ArrowUpRight /></a>
+            <a className="button button-dark" href="/templates">Choose an agent <ArrowUpRight /></a>
             <a className="button button-soft" href="#solutions">See what we build <span>↓</span></a>
           </div>
         </div>
@@ -85,7 +86,9 @@ export function MarketingPage() {
         <div className="trust-items"><span>Websites</span><i /> <span>Apps</span><i /> <span>Systems</span><i /> <span>AI automation</span></div>
       </section>
 
-      <section className="capabilities section-shell" id="solutions">
+      <LandingAgentCarousel />
+
+      <section className="capabilities section-shell" id="product">
         <div className="section-heading">
           <div><span className="section-index">01 — What we do</span><h2>Useful AI.<br />Thoughtfully applied.</h2></div>
           <p>Skip the AI theatre. We create clear, custom tools that save time for your team and make every customer interaction feel more considered.</p>
@@ -137,7 +140,7 @@ export function MarketingPage() {
 
       <Integrations />
 
-      <section className="studio-band">
+      <section className="studio-band" id="safety">
         <div className="section-shell studio-band-inner">
           <div><span className="section-index">04 — The 1forge difference</span><h2>AI is better when it<br />belongs to the <em>whole system.</em></h2></div>
           <div className="studio-points">
@@ -171,7 +174,13 @@ export function MarketingPage() {
         </div>
       </section>
 
-      <footer className="footer section-shell"><span>© {new Date().getFullYear()} 1forge Studio</span><a href="#top">Back to top ↑</a></footer>
+      <section className="ecosystem-footer section-shell">
+        <div><span className="section-index">The 1forge ecosystem</span><h2>One forge.<br />Connected products.</h2></div>
+        <a href="https://studio.1forge.in/" target="_blank" rel="noreferrer"><b>01</b><span><strong>Studio</strong><small>Software, apps & AI systems</small></span><ArrowUpRight /></a>
+        <a href="https://1forgedesign.com/" target="_blank" rel="noreferrer"><b>02</b><span><strong>Designs</strong><small>Premium interface foundations</small></span><ArrowUpRight /></a>
+        <a href="/projects"><b>03</b><span><strong>ForgeOS</strong><small>Custom browser agents</small></span><ArrowUpRight /></a>
+      </section>
+      <footer className="footer section-shell"><span>© {new Date().getFullYear()} 1forge Studio · ForgeOS</span><div><a href="/docs">Docs</a><a href="/pricing">Pricing</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/projects">Log in</a><a href="#top">Back to top ↑</a></div></footer>
     </main>
   )
 }

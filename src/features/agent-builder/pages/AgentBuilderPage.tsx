@@ -26,6 +26,8 @@ import {
   Workflow,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import { useParams } from 'react-router-dom'
+import { productApi } from '../../product/api'
 import { AgentNodeCard } from '../components/AgentNodeCard'
 import { InspectorPanel } from '../components/InspectorPanel'
 import { InstallAgentPanel } from '../components/InstallAgentPanel'
@@ -74,6 +76,7 @@ export function AgentBuilderPage() {
 }
 
 function AgentBuilder() {
+  const { agentId = '' } = useParams()
   const initial = useMemo(loadWorkflow, [])
   const [nodes, setNodes, onNodesChange] = useNodesState<AgentNode>(initial.nodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState<AgentEdge>(initial.edges)
@@ -85,6 +88,8 @@ function AgentBuilder() {
   const [showRun, setShowRun] = useState(false)
   const [logs, setLogs] = useState<RunLog[]>([])
   const [notice, setNotice] = useState('')
+  const [saveState, setSaveState] = useState<'loading' | 'saving' | 'saved' | 'error'>('loading')
+  const hydrated = useRef(false)
   const activityTimer = useRef<number | null>(null)
   const { screenToFlowPosition, fitView } = useReactFlow<AgentNode, AgentEdge>()
 
@@ -99,12 +104,33 @@ function AgentBuilder() {
   }), [edges, nodes])
 
   useEffect(() => {
+    if (!agentId) return
+    let cancelled = false
+    productApi.agent(agentId).then(({ agent }) => {
+      if (cancelled) return
+      setTitle(agent.name); setNodes(agent.nodes); setEdges(agent.edges); setReady(agent.status === 'live' || agent.status === 'testing'); hydrated.current = true; setSaveState('saved')
+      window.setTimeout(() => void fitView({ padding: 0.16, duration: 450 }), 80)
+    }).catch(() => { if (!cancelled) { hydrated.current = true; setSaveState('error'); setNotice('This agent could not be loaded') } })
+    return () => { cancelled = true }
+  }, [agentId, fitView, setEdges, setNodes])
+
+  useEffect(() => {
+    if (!agentId || !hydrated.current) return
+    setSaveState('saving')
     const timer = window.setTimeout(() => {
-      const workflow: SavedWorkflow = { title, ready, nodes, edges }
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(workflow))
-    }, 250)
+      const websiteNode = nodes.find((node) => node.data.kind === 'targetWebsite')
+      const goalNode = nodes.find((node) => node.data.kind === 'taskGoal')
+      productApi.updateAgent(agentId, {
+        name: title,
+        websiteUrl: String(websiteNode?.data.config.websiteUrl || ''),
+        goal: String(goalNode?.data.config.goal || ''),
+        nodes,
+        edges,
+        status: ready ? 'testing' : 'draft',
+      }).then(() => setSaveState('saved')).catch(() => setSaveState('error'))
+    }, 700)
     return () => window.clearTimeout(timer)
-  }, [title, ready, nodes, edges])
+  }, [agentId, title, ready, nodes, edges])
 
   useEffect(() => {
     if (!notice) return
@@ -207,8 +233,8 @@ function AgentBuilder() {
     <div className="studio-page">
       <header className="studio-header">
         <div className="studio-branding">
-          <a href="/" className="studio-back" aria-label="Back to 1forge home"><ArrowLeft size={16} /></a>
-          <a href="/" className="studio-logo"><span>F</span><div><strong>ForgeOS</strong><small>Agent studio</small></div></a>
+          <a href="/projects" className="studio-back" aria-label="Back to agents"><ArrowLeft size={16} /></a>
+          <a href="/projects" className="studio-logo"><span>F</span><div><strong>ForgeOS</strong><small>Agent studio</small></div></a>
           <i />
           <div className="workflow-name">
             <input aria-label="Agent name" value={title} onChange={(event) => setTitle(event.target.value)} />
@@ -223,7 +249,7 @@ function AgentBuilder() {
         </nav>
 
         <div className="studio-actions">
-          <div className="save-state"><Cloud size={13} /><span>Draft saved</span></div>
+          <div className={`save-state ${saveState}`}><Cloud size={13} /><span>{saveState === 'saving' ? 'Saving…' : saveState === 'error' ? 'Save failed' : saveState === 'loading' ? 'Loading…' : 'Saved to workspace'}</span></div>
           {view === 'build' && <button className="secondary-action" onClick={simulateAgent} disabled={running || !healthy}><Play size={14} fill="currentColor" /> {running ? 'Running…' : 'Dry run'}</button>}
           <button className={`publish-action${ready ? ' published' : ''}`} onClick={ready ? () => setView('install') : markReady}>{ready ? <Check size={14} /> : <Save size={14} />} {ready ? 'Ready to deploy' : 'Validate agent'}</button>
         </div>
@@ -268,8 +294,8 @@ function AgentBuilder() {
         </div>
       )}
 
-      {view === 'test' && <TestAgentPanel title={title} nodes={nodes} edges={edges} onActivity={showConversationActivity} />}
-      {view === 'install' && <InstallAgentPanel title={title} nodes={nodes} edges={edges} onOpenTest={() => setView('test')} />}
+      {view === 'test' && <TestAgentPanel agentId={agentId} title={title} nodes={nodes} edges={edges} onActivity={showConversationActivity} />}
+      {view === 'install' && <InstallAgentPanel agentId={agentId} title={title} nodes={nodes} edges={edges} onOpenTest={() => setView('test')} />}
 
       {notice && <div className="studio-notice"><Check size={14} />{notice}</div>}
       <div className="studio-ambient studio-ambient-one" />

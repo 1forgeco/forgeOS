@@ -1,19 +1,25 @@
 import { AlertTriangle, Check, Code2, Download, ExternalLink, Puzzle, ShieldCheck } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { compileBrowserWorkflow, downloadWorkflow } from '../runtime/browserWorkflow'
+import { productApi } from '../../product/api'
 import type { AgentEdge, AgentNode } from '../types'
 
 type InstallAgentPanelProps = {
+  agentId: string
   title: string
   nodes: AgentNode[]
   edges: AgentEdge[]
   onOpenTest: () => void
 }
 
-export function InstallAgentPanel({ title, nodes, edges, onOpenTest }: InstallAgentPanelProps) {
+export function InstallAgentPanel({ agentId, title, nodes, edges, onOpenTest }: InstallAgentPanelProps) {
   const [downloaded, setDownloaded] = useState(false)
+  const [deployedVersion, setDeployedVersion] = useState<number | null>(null)
+  const [deploying, setDeploying] = useState(false)
+  const [versions, setVersions] = useState<Array<{ id: string; version: number; createdAt: string }>>([])
   const compiled = useMemo(() => compileBrowserWorkflow(title, nodes, edges), [title, nodes, edges])
   const definition = compiled.definition
+  useEffect(() => { if (agentId) productApi.versions(agentId).then((result) => setVersions(result.versions)).catch(() => setVersions([])) }, [agentId, deployedVersion])
 
   const exportAgent = () => {
     if (!definition) return
@@ -21,6 +27,14 @@ export function InstallAgentPanel({ title, nodes, edges, onOpenTest }: InstallAg
     setDownloaded(true)
     window.setTimeout(() => setDownloaded(false), 1800)
   }
+
+  const deployAgent = async () => {
+    if (!definition || !agentId || deploying) return
+    setDeploying(true)
+    try { const result = await productApi.deployAgent(agentId, { runtime: definition, name: title, nodes, edges }); setDeployedVersion(result.version) } finally { setDeploying(false) }
+  }
+
+  const restore = async (version: number) => { if (!window.confirm(`Restore version ${version} as a new draft?`)) return; await productApi.restoreVersion(agentId, version); window.location.reload() }
 
   return (
     <main className="install-agent-view deploy-agent-view">
@@ -33,7 +47,7 @@ export function InstallAgentPanel({ title, nodes, edges, onOpenTest }: InstallAg
       <div className="deploy-readiness-card">
         <div className={`deploy-readiness-icon ${definition ? 'ready' : 'blocked'}`}>{definition ? <Check size={18} /> : <AlertTriangle size={18} />}</div>
         <div><strong>{definition ? 'Agent definition is ready' : 'Fix the workflow before deploying'}</strong><p>{definition ? `${definition.allowedDomains.length} allowed domain${definition.allowedDomains.length === 1 ? '' : 's'} · ${definition.allowedActions.length} browser capabilities · ${definition.approvalActions.length} approval checks` : compiled.errors[0]}</p></div>
-        <button onClick={onOpenTest}>Run test <ExternalLink size={13} /></button>
+        <button onClick={() => void deployAgent()} disabled={!definition || deploying}>{deployedVersion ? `Version ${deployedVersion} live` : deploying ? 'Publishing…' : 'Publish version'} <ExternalLink size={13} /></button>
       </div>
 
       <div className="install-grid">
@@ -61,6 +75,7 @@ export function InstallAgentPanel({ title, nodes, edges, onOpenTest }: InstallAg
         <div><span><Puzzle size={18} /></span><div><strong>Hybrid execution</strong><p>The agent chooses among approved browser capabilities. You do not need a separate node for every click or filter.</p></div></div>
         <button onClick={onOpenTest}>Test the definition <ExternalLink size={13} /></button>
       </section>
+      {versions.length > 0 && <section className="version-history-card"><header><div><strong>Version history</strong><p>Published versions stay immutable. Restore any editable snapshot as a new draft.</p></div><span>{versions.length} versions</span></header><div>{versions.map((version) => <article key={version.id}><span>v{version.version}</span><div><strong>{version.version === versions[0].version ? 'Current published version' : 'Previous version'}</strong><small>{new Date(version.createdAt).toLocaleString()}</small></div>{version.version !== versions[0].version && <button onClick={() => void restore(version.version)}>Restore draft</button>}</article>)}</div></section>}
     </main>
   )
 }

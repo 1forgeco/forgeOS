@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Header } from '../components/Header'
 import { ArrowUpRight, CheckIcon, SparkIcon } from '../components/Icons'
 import { Integrations } from '../components/Integrations'
@@ -54,31 +54,64 @@ type UseCase = keyof typeof useCases
 export function MarketingPage() {
   const [activeCase, setActiveCase] = useState<UseCase>('Sales')
   const selected = useCases[activeCase]
+  const heroRef = useRef<HTMLElement>(null)
+
+  const moveHero = (clientX: number, clientY: number) => {
+    const hero = heroRef.current
+    if (!hero) return
+    const bounds = hero.getBoundingClientRect()
+    const x = (clientX - bounds.left) / bounds.width - 0.5
+    const y = (clientY - bounds.top) / bounds.height - 0.5
+    hero.style.setProperty('--hero-video-x', `${x * -18}px`)
+    hero.style.setProperty('--hero-video-y', `${y * -12}px`)
+    hero.style.setProperty('--hero-copy-x', `${x * 7}px`)
+    hero.style.setProperty('--hero-copy-y', `${y * 5}px`)
+    hero.style.setProperty('--hero-light-x', `${(x + 0.5) * 100}%`)
+    hero.style.setProperty('--hero-light-y', `${(y + 0.5) * 100}%`)
+  }
+
+  const resetHero = () => {
+    const hero = heroRef.current
+    if (!hero) return
+    for (const property of ['--hero-video-x', '--hero-video-y', '--hero-copy-x', '--hero-copy-y']) hero.style.setProperty(property, '0px')
+    hero.style.setProperty('--hero-light-x', '72%')
+    hero.style.setProperty('--hero-light-y', '28%')
+  }
 
   return (
     <main>
       <Header />
 
-      <section className="hero section-shell" id="top">
-        <div className="hero-copy">
-          <div className="eyebrow"><SparkIcon /> AI automation by 1forge Studio</div>
-          <h1>
-            From daily process<br />
-            to <em>AI-powered flow.</em>
-          </h1>
-          <p className="hero-intro">We design practical AI agents and automations around the way your business already works — not around the latest buzzword.</p>
-          <div className="hero-actions">
-            <a className="button button-dark" href="/templates">Choose an agent <ArrowUpRight /></a>
-            <a className="button button-soft" href="#solutions">See what we build <span>↓</span></a>
+      <section className="hero cinematic-hero" id="top" ref={heroRef} onPointerMove={(event) => moveHero(event.clientX, event.clientY)} onPointerLeave={resetHero}>
+        <div className="cinematic-hero-media" aria-hidden="true">
+          <video className="cinematic-hero-video" autoPlay muted loop playsInline preload="metadata">
+            <source src="/New_Header_Final%20(compressed).mp4" type="video/mp4" />
+          </video>
+          <div className="cinematic-hero-wash" />
+          <div className="cinematic-hero-light" />
+          <div className="cinematic-hero-grain" />
+        </div>
+        <div className="cinematic-hero-inner section-shell">
+          <div className="hero-copy">
+            <div className="eyebrow"><SparkIcon /> Custom browser agents by 1forge</div>
+            <h1>
+              From an instruction<br />
+              to an <em>agent that acts.</em>
+            </h1>
+            <p className="hero-intro">Choose a starting point, describe the website and outcome, then shape a visual workflow that can be tested, approved, and deployed.</p>
+            <div className="hero-actions">
+              <a className="button button-dark" href="/login?mode=register&next=/templates">Build your agent <ArrowUpRight /></a>
+              <a className="button button-soft" href="#agents">Explore templates <span>↓</span></a>
+            </div>
+            <div className="cinematic-hero-proof"><span><i /> Visual workflows</span><span><i /> Human approvals</span><span><i /> Domain locked</span></div>
+          </div>
+          <div className="cinematic-hero-film-note">
+            <span><i /> ForgeOS in motion</span>
+            <strong>Connect. Test. Deploy.</strong>
+            <div><b /><b /><b /></div>
           </div>
         </div>
-        <div className="hero-video-shell">
-          <div className="hero-video-label"><span className="pulse-dot" /> A glimpse of what we can build</div>
-          <video className="hero-video" autoPlay muted loop playsInline preload="metadata">
-            <source src="https://pub-29f1d49ba0744f3ca3930a65ac24de6f.r2.dev/New_Header_Final%20(compressed).mp4" type="video/mp4" />
-            Your browser does not support this video.
-          </video>
-        </div>
+        <a className="cinematic-scroll" href="#agents"><span>Scroll to explore</span><i /></a>
       </section>
 
       <section className="trust-strip section-shell" aria-label="1forge services">

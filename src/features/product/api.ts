@@ -1,13 +1,31 @@
 import type { AccountSession, AgentRunRecord, ApprovalRecord, StoredAgent } from './types'
 
+type ApiErrorBody = { error?: string; requestId?: string }
+
+function responseError(response: Response, body: ApiErrorBody | null, rawBody: string) {
+  if (body?.error) return body.error
+  if (response.status === 401 || response.status === 403) return 'Your ForgeOS session has expired. Refresh the page and sign in again.'
+  if (response.status === 404) return 'ForgeOS could not find that action. Refresh the page and try again.'
+  if (response.status >= 500) return 'ForgeOS had a server problem while saving this agent. Your setup is still here—please try again.'
+  if (!rawBody) return 'ForgeOS received an empty response while saving. Your setup is still here—please try again.'
+  return 'ForgeOS received an unexpected response. Refresh the page and try again.'
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+    credentials: 'same-origin',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(init?.headers || {}) },
   })
-  const body = await response.json() as T & { error?: string }
-  if (!response.ok) throw new Error(body.error || 'ForgeOS could not complete that request.')
-  return body
+  const rawBody = await response.text()
+  let body: (T & ApiErrorBody) | null = null
+
+  if (rawBody) {
+    try { body = JSON.parse(rawBody) as T & ApiErrorBody } catch { body = null }
+  }
+
+  if (!response.ok || !body) throw new Error(responseError(response, body, rawBody))
+  return body as T
 }
 
 export const productApi = {

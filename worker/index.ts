@@ -21,7 +21,10 @@ const corsHeaders = (request: Request) => ({
 })
 
 function json(request: Request, body: unknown, init?: ResponseInit) {
-  return Response.json(body, { ...init, headers: { ...corsHeaders(request), 'Cache-Control': 'no-store', ...(init?.headers || {}) } })
+  return new Response(JSON.stringify(body), {
+    ...init,
+    headers: { ...corsHeaders(request), 'Cache-Control': 'no-store', 'Content-Type': 'application/json; charset=utf-8', ...(init?.headers || {}) },
+  })
 }
 
 function decodeName(request: Request) {
@@ -88,7 +91,8 @@ async function handleAgents(request: Request, env: WorkerEnv) {
     const result = await context.db.prepare('SELECT * FROM agents WHERE workspace_id = ? ORDER BY updated_at DESC').bind(context.identity.workspaceId).all<AgentRow>()
     return json(request, { agents: (result.results || []).map(mapAgent) })
   }
-  const body = await request.json() as Record<string, unknown>
+  let body: Record<string, unknown>
+  try { body = await request.json() as Record<string, unknown> } catch { return json(request, { error: 'The agent setup was not valid JSON. Please review it and try again.' }, { status: 400 }) }
   const name = String(body.name || '').trim().slice(0, 120)
   const websiteUrl = String(body.websiteUrl || '').trim().slice(0, 1_500)
   const goal = String(body.goal || '').trim().slice(0, 5_000)
@@ -255,6 +259,7 @@ export default {
       const detail = error instanceof Error ? error.message : 'Unexpected ForgeOS error'
       return json(request, { error: detail }, { status: 500 })
     }
+    if (url.pathname.startsWith('/api/')) return json(request, { error: 'ForgeOS API route not found.' }, { status: 404 })
     const response = await env.ASSETS.fetch(request)
     if (response.status !== 404 || request.method !== 'GET') return response
     url.pathname = '/index.html'

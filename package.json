@@ -4,9 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "vite",
+    "dev:api": "wrangler dev --local --port 8787 --persist-to .wrangler/state",
     "build": "tsc -b && node scripts/clean-build.mjs && vite build && vite build --ssr worker/index.ts --outDir dist/server",
     "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply forgeos-local --local --persist-to .wrangler/state",
     "lint": "oxlint",
     "preview": "vite preview"
   },
@@ -27,6 +30,7 @@
     "drizzle-kit": "^0.31.10",
     "oxlint": "^1.71.0",
     "typescript": "~6.0.2",
-    "vite": "^8.1.1"
+    "vite": "^8.1.1",
+    "wrangler": "^4.113.0"
   }
 }

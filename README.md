@@ -25,6 +25,13 @@ npm install
 npm run dev
 ```
 
+`npm run dev` now prepares the local D1 database and starts both services:
+
+- ForgeOS UI: `http://localhost:5173`
+- Local Worker API: `http://localhost:8787`
+
+Vite proxies `/api/*` to the Worker, so registration, sign-in, saved agents, and other account-backed features work from the normal `localhost:5173` URL. Local data is stored under `.wrangler/` and is intentionally excluded from Git.
+
 Validation:
 
 ```bash
@@ -33,7 +40,7 @@ npm run build
 npm run lint
 ```
 
-Local Vite development does not provide the Worker API or D1 binding. The deployed Sites environment supplies authenticated identity headers and the `DB` binding.
+If an older frontend-only development process is already running, stop it once and rerun `npm run dev` so the API process and proxy are started too.
 
 ## Project structure
 

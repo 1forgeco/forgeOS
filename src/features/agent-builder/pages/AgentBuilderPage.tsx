@@ -16,27 +16,33 @@ import {
   ArrowLeft,
   Check,
   ChevronDown,
-  CircleHelp,
   Cloud,
+  Code2,
+  MessageSquareText,
   Play,
   RotateCcw,
-  Rocket,
+  Save,
   Sparkles,
+  Workflow,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { AgentNodeCard } from '../components/AgentNodeCard'
 import { InspectorPanel } from '../components/InspectorPanel'
+import { InstallAgentPanel } from '../components/InstallAgentPanel'
 import { NodePalette } from '../components/NodePalette'
 import { RunPanel } from '../components/RunPanel'
+import { TestAgentPanel } from '../components/TestAgentPanel'
 import { DEFAULT_EDGES, DEFAULT_NODES, createPaletteNode } from '../data/defaultWorkflow'
 import type { AgentEdge, AgentNode, AgentNodeData, AgentNodeKind, RunLog } from '../types'
 import '../styles/agent-builder.css'
 
-const STORAGE_KEY = 'forgeos.booking-agent.v1'
+const STORAGE_KEY = 'forgeos.booking-agent.v2'
+
+type StudioView = 'build' | 'test' | 'install'
 
 type SavedWorkflow = {
   title: string
-  published: boolean
+  ready: boolean
   nodes: AgentNode[]
   edges: AgentEdge[]
 }
@@ -50,7 +56,7 @@ function loadWorkflow(): SavedWorkflow {
   }
   return {
     title: 'Service Finder & Booking Agent',
-    published: false,
+    ready: false,
     nodes: DEFAULT_NODES,
     edges: DEFAULT_EDGES,
   }
@@ -59,14 +65,14 @@ function loadWorkflow(): SavedWorkflow {
 function runDetail(kind: AgentNodeKind) {
   const details: Record<AgentNodeKind, string> = {
     websiteChat: 'Received “I need a strategy consultation next week.”',
-    collectRequirements: 'Captured service, preferred date, location, and budget.',
-    searchCatalog: 'Found 6 matching services in the connected catalogue.',
-    filterRank: 'Ranked the 3 strongest matches using your business rules.',
+    collectRequirements: 'Understood the service, preferred date, location, and budget.',
+    searchCatalog: 'Found matching services in the approved service list.',
+    filterRank: 'Selected the strongest options using your rules.',
     checkAvailability: 'Found open times on Tuesday and Thursday.',
-    requestConfirmation: 'Customer confirmed Thursday at 4:00 PM.',
-    createBooking: 'Created a calendar event with the customer details.',
-    sendConfirmation: 'Prepared confirmation for the customer.',
-    humanHandoff: 'Prepared a handoff with the complete conversation context.',
+    requestConfirmation: 'The visitor confirmed Thursday at 4:00 PM.',
+    createBooking: 'Saved the booking request with the visitor’s details.',
+    sendConfirmation: 'Prepared the confirmation and reference number.',
+    humanHandoff: 'Prepared a handoff with the complete conversation.',
   }
   return details[kind]
 }
@@ -104,13 +110,14 @@ function AgentBuilder() {
   const [nodes, setNodes, onNodesChange] = useNodesState<AgentNode>(initial.nodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState<AgentEdge>(initial.edges)
   const [title, setTitle] = useState(initial.title)
-  const [published, setPublished] = useState(initial.published)
+  const [ready, setReady] = useState(initial.ready)
+  const [view, setView] = useState<StudioView>('build')
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
   const [showRun, setShowRun] = useState(false)
   const [logs, setLogs] = useState<RunLog[]>([])
   const [notice, setNotice] = useState('')
-  const canvasRef = useRef<HTMLDivElement>(null)
+  const activityTimer = useRef<number | null>(null)
   const { screenToFlowPosition, fitView } = useReactFlow<AgentNode, AgentEdge>()
 
   const selectedNode = nodes.find((node) => node.id === selectedNodeId) ?? null
@@ -124,17 +131,21 @@ function AgentBuilder() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      const workflow: SavedWorkflow = { title, published, nodes, edges }
+      const workflow: SavedWorkflow = { title, ready, nodes, edges }
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(workflow))
     }, 250)
     return () => window.clearTimeout(timer)
-  }, [title, published, nodes, edges])
+  }, [title, ready, nodes, edges])
 
   useEffect(() => {
     if (!notice) return
     const timer = window.setTimeout(() => setNotice(''), 2400)
     return () => window.clearTimeout(timer)
   }, [notice])
+
+  useEffect(() => () => {
+    if (activityTimer.current) window.clearTimeout(activityTimer.current)
+  }, [])
 
   const onConnect = useCallback((connection: Connection) => {
     setEdges((current) => addEdge({ ...connection, type: 'smoothstep', animated: true, data: { path: 'primary' } }, current))
@@ -170,10 +181,10 @@ function AgentBuilder() {
     setNodes(DEFAULT_NODES.map((node) => ({ ...node, data: { ...node.data, config: { ...node.data.config } } })))
     setEdges(DEFAULT_EDGES.map((edge) => ({ ...edge })))
     setSelectedNodeId(null)
-    setPublished(false)
+    setReady(false)
     setLogs([])
     setShowRun(false)
-    setNotice('Template restored')
+    setNotice('Starting workflow restored')
     window.setTimeout(() => void fitView({ padding: 0.16, duration: 500 }), 50)
   }
 
@@ -192,25 +203,33 @@ function AgentBuilder() {
         id: logId,
         nodeId: node.id,
         label: node.data.label,
-        detail: 'Processing sample customer request…',
+        detail: 'Handling this part of the example…',
         status: 'running',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
       }])
-      await new Promise((resolve) => window.setTimeout(resolve, 520))
+      await new Promise((resolve) => window.setTimeout(resolve, 480))
       setNodes((current) => current.map((item) => item.id === node.id ? { ...item, data: { ...item.data, status: 'success' } } : item))
       setLogs((current) => current.map((log) => log.id === logId ? { ...log, detail: runDetail(node.data.kind), status: 'success' } : log))
     }
     setRunning(false)
-    setNotice('Simulation completed successfully')
+    setNotice('Example completed successfully')
   }
 
-  const publishAgent = () => {
+  const showConversationActivity = (steps: AgentNodeKind[]) => {
+    if (activityTimer.current) window.clearTimeout(activityTimer.current)
+    setNodes((current) => current.map((node) => ({ ...node, data: { ...node.data, status: steps.includes(node.data.kind) ? 'running' : 'idle' } })))
+    activityTimer.current = window.setTimeout(() => {
+      setNodes((current) => current.map((node) => ({ ...node, data: { ...node.data, status: steps.includes(node.data.kind) ? 'success' : 'idle' } })))
+    }, 700)
+  }
+
+  const markReady = () => {
     if (!healthy) {
-      setNotice('Connect an input and booking action before publishing')
+      setNotice('Connect the website chat to a booking step first')
       return
     }
-    setPublished((current) => !current)
-    setNotice(published ? 'Agent returned to draft' : 'Agent published')
+    setReady(true)
+    setNotice('Agent marked ready to install')
   }
 
   return (
@@ -221,52 +240,65 @@ function AgentBuilder() {
           <a href="/" className="studio-logo"><span>F</span><div><strong>ForgeOS</strong><small>Agent studio</small></div></a>
           <i />
           <div className="workflow-name">
-            <input aria-label="Workflow name" value={title} onChange={(event) => setTitle(event.target.value)} />
-            <button aria-label="Workflow menu"><ChevronDown size={13} /></button>
+            <input aria-label="Agent name" value={title} onChange={(event) => setTitle(event.target.value)} />
+            <button aria-label="Agent menu"><ChevronDown size={13} /></button>
           </div>
         </div>
-        <div className="save-state"><Cloud size={13} /><span>Saved to this device</span></div>
+
+        <nav className="studio-view-tabs" aria-label="Agent setup sections">
+          <button className={view === 'build' ? 'active' : ''} onClick={() => setView('build')}><Workflow size={13} /> Build</button>
+          <button className={view === 'test' ? 'active' : ''} onClick={() => setView('test')}><MessageSquareText size={13} /> Test</button>
+          <button className={view === 'install' ? 'active' : ''} onClick={() => setView('install')}><Code2 size={13} /> Install</button>
+        </nav>
+
         <div className="studio-actions">
-          <button className="icon-action" aria-label="Help"><CircleHelp size={17} /></button>
-          <button className="secondary-action" onClick={simulateAgent} disabled={running || !healthy}><Play size={14} fill="currentColor" /> {running ? 'Running…' : 'Test agent'}</button>
-          <button className={`publish-action${published ? ' published' : ''}`} onClick={publishAgent}>{published ? <Check size={14} /> : <Rocket size={14} />} {published ? 'Published' : 'Publish'}</button>
+          <div className="save-state"><Cloud size={13} /><span>Draft saved</span></div>
+          {view === 'build' && <button className="secondary-action" onClick={simulateAgent} disabled={running || !healthy}><Play size={14} fill="currentColor" /> {running ? 'Running…' : 'Run example'}</button>}
+          <button className={`publish-action${ready ? ' published' : ''}`} onClick={ready ? () => setView('install') : markReady}>{ready ? <Check size={14} /> : <Save size={14} />} {ready ? 'Ready to install' : 'Mark ready'}</button>
         </div>
       </header>
 
-      <div className="studio-body">
-        <NodePalette onAdd={addNode} />
-        <main className="workflow-stage" ref={canvasRef} onDrop={onDrop} onDragOver={(event) => event.preventDefault()}>
-          <div className="canvas-context">
-            <div className="template-pill"><Sparkles size={13} /><span>Service Finder & Booking</span><b>Starter</b></div>
-            <button onClick={resetTemplate}><RotateCcw size={13} /> Reset template</button>
-          </div>
-          <div className="canvas-health"><span className={healthy ? 'healthy' : ''} /><div><strong>{healthy ? 'Workflow ready' : 'Needs attention'}</strong><small>{nodes.length} blocks · {edges.length} connections</small></div></div>
-          <ReactFlow<AgentNode, AgentEdge>
-            nodes={nodes}
-            edges={visibleEdges}
-            nodeTypes={nodeTypes}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onNodeClick={(_, node) => setSelectedNodeId(node.id)}
-            onPaneClick={() => setSelectedNodeId(null)}
-            fitView
-            fitViewOptions={{ padding: 0.16 }}
-            minZoom={0.25}
-            maxZoom={1.6}
-            defaultEdgeOptions={{ type: 'smoothstep', animated: true }}
-            connectionLineStyle={{ stroke: '#7668f7', strokeWidth: 2 }}
-            proOptions={{ hideAttribution: true }}
-            deleteKeyCode={['Backspace', 'Delete']}
-          >
-            <Background variant={BackgroundVariant.Dots} gap={18} size={1.1} color="#d8dce8" />
-            <Controls position="bottom-left" showInteractive={false} />
-            <MiniMap position="bottom-right" pannable zoomable nodeStrokeWidth={2} maskColor="rgba(244, 246, 251, .78)" />
-          </ReactFlow>
-          {showRun && <RunPanel logs={logs} running={running} onClose={() => !running && setShowRun(false)} />}
-        </main>
-        <InspectorPanel node={selectedNode} onChange={updateSelectedNode} onDelete={deleteSelectedNode} onClose={() => setSelectedNodeId(null)} />
-      </div>
+      {view === 'build' && (
+        <div className="studio-body">
+          <NodePalette onAdd={addNode} onOpenTest={() => setView('test')} onOpenInstall={() => setView('install')} />
+          <main className="workflow-stage" onDrop={onDrop} onDragOver={(event) => event.preventDefault()}>
+            <div className="canvas-context">
+              <div className="template-pill"><Sparkles size={13} /><span>Service Finder & Booking</span><b>Starting workflow</b></div>
+              <button onClick={() => void simulateAgent()}><Play size={12} /> Show me how it runs</button>
+              <button onClick={resetTemplate}><RotateCcw size={12} /> Start over</button>
+            </div>
+            <div className="canvas-guide"><b>1</b><span>Click a card</span><i /><b>2</b><span>Change its instructions on the right</span><i /><b>3</b><span>Use Test when you are ready</span></div>
+            <div className="canvas-health"><span className={healthy ? 'healthy' : ''} /><div><strong>{healthy ? 'Agent steps are connected' : 'A step is disconnected'}</strong><small>{nodes.length} steps · {edges.length} connections</small></div></div>
+            <ReactFlow<AgentNode, AgentEdge>
+              nodes={nodes}
+              edges={visibleEdges}
+              nodeTypes={nodeTypes}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onNodeClick={(_, node) => setSelectedNodeId(node.id)}
+              onPaneClick={() => setSelectedNodeId(null)}
+              fitView
+              fitViewOptions={{ padding: 0.16 }}
+              minZoom={0.25}
+              maxZoom={1.6}
+              defaultEdgeOptions={{ type: 'smoothstep', animated: true }}
+              connectionLineStyle={{ stroke: '#7668f7', strokeWidth: 2 }}
+              proOptions={{ hideAttribution: true }}
+              deleteKeyCode={['Backspace', 'Delete']}
+            >
+              <Background variant={BackgroundVariant.Dots} gap={18} size={1.1} color="#d8dce8" />
+              <Controls position="bottom-left" showInteractive={false} />
+              <MiniMap position="bottom-right" pannable zoomable nodeStrokeWidth={2} maskColor="rgba(244, 246, 251, .78)" />
+            </ReactFlow>
+            {showRun && <RunPanel logs={logs} running={running} onClose={() => !running && setShowRun(false)} />}
+          </main>
+          <InspectorPanel node={selectedNode} onChange={updateSelectedNode} onDelete={deleteSelectedNode} onClose={() => setSelectedNodeId(null)} />
+        </div>
+      )}
+
+      {view === 'test' && <TestAgentPanel onActivity={showConversationActivity} />}
+      {view === 'install' && <InstallAgentPanel onOpenTest={() => setView('test')} />}
 
       {notice && <div className="studio-notice"><Check size={14} />{notice}</div>}
       <div className="studio-ambient studio-ambient-one" />

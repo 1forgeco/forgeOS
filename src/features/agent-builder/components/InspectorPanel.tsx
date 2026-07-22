@@ -14,9 +14,9 @@ export function InspectorPanel({ node, onChange, onDelete, onClose }: InspectorP
     return (
       <aside className="inspector-panel inspector-empty">
         <div className="inspector-empty-icon"><Settings2 size={21} /></div>
-        <h2>Configure a block</h2>
-        <p>Select any block to edit its instructions, connection, and behavior.</p>
-        <div className="inspector-empty-note"><Info size={14} /><span>Changes are saved automatically in this browser.</span></div>
+        <h2>Choose a step to edit it</h2>
+        <p>Click any card in the workflow. We’ll show exactly what you can change and an example of what to enter.</p>
+        <div className="inspector-empty-note"><Info size={14} /><span>Your draft saves automatically on this device.</span></div>
       </aside>
     )
   }
@@ -32,7 +32,7 @@ export function InspectorPanel({ node, onChange, onDelete, onClose }: InspectorP
   return (
     <aside className="inspector-panel">
       <div className="inspector-header">
-        <span>Block settings</span>
+        <span>What should this step do?</span>
         <button onClick={onClose} aria-label="Close settings"><X size={16} /></button>
       </div>
       <div className="inspector-title">
@@ -41,11 +41,11 @@ export function InspectorPanel({ node, onChange, onDelete, onClose }: InspectorP
       </div>
       <div className="inspector-form">
         <label>
-          <span>Block name</span>
+          <span>Step name shown on the canvas</span>
           <input value={node.data.label} onChange={(event) => onChange({ ...node.data, label: event.target.value })} />
         </label>
         <label>
-          <span>Description</span>
+          <span>Explain this step in one sentence</span>
           <textarea rows={3} value={node.data.description} onChange={(event) => onChange({ ...node.data, description: event.target.value })} />
         </label>
         <div className="inspector-rule" />
@@ -62,7 +62,7 @@ export function InspectorPanel({ node, onChange, onDelete, onClose }: InspectorP
         ))}
       </div>
       <div className="inspector-footer">
-        <button className="delete-node" onClick={onDelete}><Trash2 size={14} /> Delete block</button>
+        <button className="delete-node" onClick={onDelete}><Trash2 size={14} /> Remove this step</button>
       </div>
     </aside>
   )

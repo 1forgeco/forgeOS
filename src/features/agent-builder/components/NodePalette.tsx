@@ -1,13 +1,15 @@
-import { Bot, GripVertical, Plus, Radio, Search } from 'lucide-react'
+import { ArrowRight, Bot, Check, Circle, GripVertical, Plus, Radio, Search } from 'lucide-react'
 import { useMemo, useState, type DragEvent } from 'react'
 import { NODE_GROUPS, NODE_REGISTRY } from '../data/nodeRegistry'
 import type { AgentNodeKind } from '../types'
 
 type NodePaletteProps = {
   onAdd: (kind: AgentNodeKind) => void
+  onOpenTest: () => void
+  onOpenInstall: () => void
 }
 
-export function NodePalette({ onAdd }: NodePaletteProps) {
+export function NodePalette({ onAdd, onOpenTest, onOpenInstall }: NodePaletteProps) {
   const [query, setQuery] = useState('')
   const groups = useMemo(() => {
     const normalized = query.trim().toLowerCase()
@@ -36,13 +38,21 @@ export function NodePalette({ onAdd }: NodePaletteProps) {
           <i />
         </button>
       </section>
+      <section className="setup-guide">
+        <div className="setup-guide-heading"><span>Get this agent ready</span><b>2 of 4</b></div>
+        <div className="setup-progress"><i /></div>
+        <button type="button"><Check size={12} /><span><strong>Starting workflow added</strong><small>Your booking steps are connected.</small></span></button>
+        <button type="button"><Check size={12} /><span><strong>Example services added</strong><small>Three test services are ready.</small></span></button>
+        <button type="button" onClick={onOpenTest}><Circle size={11} /><span><strong>Test a conversation</strong><small>See how the agent responds.</small></span><ArrowRight size={11} /></button>
+        <button type="button" onClick={onOpenInstall}><Circle size={11} /><span><strong>Add it to your website</strong><small>Copy the installation code.</small></span><ArrowRight size={11} /></button>
+      </section>
       <div className="palette-heading">
-        <span>Building blocks</span>
-        <b>{Object.keys(NODE_REGISTRY).length}</b>
+        <span>Add another step</span>
+        <b>{Object.keys(NODE_REGISTRY).length} available</b>
       </div>
       <label className="palette-search">
         <Search size={14} />
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search blocks" aria-label="Search workflow blocks" />
+        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find a step to add" aria-label="Find a workflow step" />
       </label>
       <div className="palette-scroll">
         {groups.map((group) => (
@@ -58,7 +68,7 @@ export function NodePalette({ onAdd }: NodePaletteProps) {
                   onDragStart={(event) => startDrag(event, kind)}
                   onDoubleClick={() => onAdd(kind)}
                   key={kind}
-                  title="Drag onto the canvas or double-click to add"
+                  title="Drag this step onto the canvas or double-click to add it"
                 >
                   <span className="palette-item-icon" style={{ color: item.color, background: item.softColor }}><Icon size={15} /></span>
                   <span><strong>{item.label}</strong><small>{item.description}</small></span>
@@ -71,7 +81,7 @@ export function NodePalette({ onAdd }: NodePaletteProps) {
         ))}
         {groups.length === 0 && <p className="palette-empty">No matching blocks.</p>}
       </div>
-      <p className="palette-tip"><span>Tip</span> Drag a block onto the canvas, then connect its handles.</p>
+      <p className="palette-tip"><span>How to edit</span> Click a card to change it. Drag from one small dot to another to connect steps.</p>
     </aside>
   )
 }

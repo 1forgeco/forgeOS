@@ -2,7 +2,7 @@
 
 ForgeOS is 1forge Studio's visual environment for assembling, testing, and eventually deploying custom AI agents. The public landing page remains at `/`; the working agent studio lives at `/app`.
 
-The first product slice is a **Service Finder & Booking Agent**. Users can drag capability blocks onto a canvas, connect them, configure each step, simulate a realistic booking request, and see execution travel through the workflow.
+The first product slice is a **Service Finder & Booking Agent**. Users can drag clear business steps onto a canvas, connect them, configure each step, hold a complete test conversation, and install the agent on a website with one script tag.
 
 ## Local development
 
@@ -32,7 +32,7 @@ src/
     types.ts                     Shared workflow types
   App.tsx                        Route and metadata boundary
 
-worker/index.js                  Cloudflare-compatible SPA worker
+worker/index.ts                  Agent API and Cloudflare-compatible SPA worker
 scripts/                         Repeatable build preparation
 public/                          Static media and social preview
 ```
@@ -47,6 +47,8 @@ Most new capability blocks require only three focused changes:
 
 The canvas, inspector, persistence, simulation UI, and drag-and-drop behavior are shared automatically.
 
-## Current persistence
+## Agent runtime and persistence
 
-This first slice intentionally saves workflow drafts in browser storage. It is suitable for product exploration and demos, not multi-user production data. The next backend milestone should introduce workspaces, versioned workflows, encrypted connections, and durable execution history.
+Workflow drafts remain device-local while the product is still single-user. Test conversations and confirmed booking requests use the deployed agent endpoint and D1 database. The embeddable widget is served from `public/forgeos-widget.js` and calls the same runtime used by the in-product Test screen.
+
+The current agent saves a booking **request** using example 1forge services and availability. It does not yet create a Google Calendar event or send email. Those connectors should be added after workspace authentication and encrypted connection storage.

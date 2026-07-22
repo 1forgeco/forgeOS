@@ -1,6 +1,6 @@
 import type { Edge, Node } from '@xyflow/react'
 
-export type NodeCategory = 'Input' | 'Intelligence' | 'Data' | 'Logic' | 'Action' | 'Safety'
+export type NodeCategory = 'Start' | 'Understand' | 'Look up' | 'Decide' | 'Confirm or hand off' | 'Take action'
 
 export type AgentNodeKind =
   | 'websiteChat'

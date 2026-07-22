@@ -80,6 +80,7 @@ export function compileBrowserWorkflow(name: string, nodes: AgentNode[], edges: 
 
   return {
     definition: {
+      schemaVersion: 1,
       id: 'custom-browser-agent',
       name: name.trim() || 'Untitled browser agent',
       version: 1,

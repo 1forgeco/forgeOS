@@ -37,6 +37,7 @@ export type RunLog = {
 }
 
 export type BrowserWorkflowDefinition = {
+  schemaVersion: 1
   id: string
   name: string
   version: number

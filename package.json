@@ -10,7 +10,9 @@
     "build": "tsc -b && node scripts/clean-build.mjs && vite build && vite build --ssr worker/index.ts --outDir dist/server",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply forgeos-local --local --persist-to .wrangler/state",
+    "extension:package": "cd extension && zip -FS -q -r ../public/forgeos-extension.zip .",
     "lint": "oxlint",
+    "test:extension-api": "node scripts/test-extension-api.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

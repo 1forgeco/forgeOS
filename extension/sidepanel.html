@@ -8,20 +8,39 @@
   </head>
   <body>
     <main>
-      <header><span>F</span><div><strong>ForgeOS</strong><small>Browser agent</small></div></header>
+      <header class="app-header">
+        <span>F</span><div><strong>ForgeOS</strong><small id="connection">Browser agent</small></div>
+        <button id="sync" type="button" title="Sync deployed agents">↻</button>
+      </header>
+
       <section id="empty" class="empty">
-        <b>Import an agent</b>
-        <p>Export a workflow from ForgeOS, then select its JSON file here.</p>
-        <label>Choose agent file<input id="file" type="file" accept="application/json,.json" /></label>
+        <b>No deployed agents yet</b>
+        <p>Open an agent in ForgeOS and choose <strong>Deploy to extension</strong>. It will appear here automatically.</p>
+        <a id="open-forgeos" href="https://forgeos-agent-studio.kamalkatal512.chatgpt.site/projects" target="_blank">Open ForgeOS</a>
       </section>
+
+      <section id="library" class="library" hidden>
+        <div class="section-label"><strong>Your agents</strong><span id="agent-count"></span></div>
+        <div id="agent-list" class="agent-list"></div>
+      </section>
+
       <section id="agent" class="agent" hidden>
-        <div class="agent-title"><span>Ready</span><h1 id="name"></h1><p id="goal"></p></div>
+        <div class="agent-title"><span id="version">Ready</span><h1 id="name"></h1><p id="goal"></p></div>
         <dl><div><dt>Website</dt><dd id="website"></dd></div><div><dt>Permissions</dt><dd id="actions"></dd></div><div><dt>Approval</dt><dd id="approval"></dd></div></dl>
         <div id="inputs" class="inputs"></div>
+        <label class="run-option"><input id="current-tab" type="checkbox" /> Use the current tab when it is on an allowed website</label>
         <button id="run" class="run">Run agent</button>
-        <button id="replace" class="replace">Import a different agent</button>
+        <div id="run-controls" class="run-controls" hidden><button id="pause">Pause</button><button id="resume">Continue</button><button id="stop">Stop</button></div>
+        <div class="agent-links"><button id="edit">Edit in ForgeOS</button><button id="remove">Remove</button></div>
       </section>
+
+      <section id="approval-card" class="approval-card" hidden>
+        <span>PROTECTED ACTION</span><strong id="approval-title">Approval required</strong><p id="approval-detail"></p>
+        <div><button id="reject">Reject</button><button id="approve">Approve once</button></div>
+      </section>
+
       <section id="activity" class="activity" hidden><div><strong>Live activity</strong><span id="run-state">Running</span></div><ol id="events"></ol></section>
+      <details class="manual-import"><summary>Advanced: manual JSON fallback</summary><label>Choose ForgeOS agent file<input id="file" type="file" accept="application/json,.json" /></label></details>
       <footer>ForgeOS never enters passwords, payment details, CAPTCHA, or two-factor codes.</footer>
     </main>
     <script src="sidepanel.js"></script>

@@ -44,7 +44,7 @@ export function NodePalette({ onAdd, onOpenTest, onOpenInstall }: NodePalettePro
         <button type="button"><Check size={12} /><span><strong>Core workflow added</strong><small>Website, goal and safety are connected.</small></span></button>
         <button type="button"><Check size={12} /><span><strong>Browser tools added</strong><small>Search, click, type and extract are allowed.</small></span></button>
         <button type="button" onClick={onOpenTest}><Circle size={11} /><span><strong>Test the workflow</strong><small>Validate inputs and execution order.</small></span><ArrowRight size={11} /></button>
-        <button type="button" onClick={onOpenInstall}><Circle size={11} /><span><strong>Deploy the agent</strong><small>Export it for the browser extension.</small></span><ArrowRight size={11} /></button>
+        <button type="button" onClick={onOpenInstall}><Circle size={11} /><span><strong>Deploy the agent</strong><small>Send it directly to the browser extension.</small></span><ArrowRight size={11} /></button>
       </section>
       <div className="palette-heading">
         <span>Add another step</span>

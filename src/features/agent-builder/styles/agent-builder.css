@@ -861,7 +861,24 @@
 .deploy-readiness-card > div:nth-child(2) { display: grid; }
 .deploy-readiness-card strong { font-size: 10px; }
 .deploy-readiness-card p { margin: 4px 0 0; color: #898c96; font-size: 8px; }
-.deploy-readiness-card > button { height: 34px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid var(--studio-border); border-radius: 9px; background: #fff; font-size: 8px; cursor: pointer; }
+.extension-connection-card { margin-top: 24px; min-height: 72px; padding: 13px; display: grid; grid-template-columns: 39px 1fr auto; align-items: center; gap: 11px; border: 1px solid var(--studio-border); border-radius: 14px; background: rgba(255,255,255,.88); box-shadow: 0 12px 34px rgba(41,43,56,.04); }
+.extension-connection-card > span { width: 37px; height: 37px; display: grid; place-items: center; border-radius: 11px; color: #9a6558; background: #fff0ed; }
+.extension-connection-card.connected > span { color: #2f8760; background: #e4f6ec; }
+.extension-connection-card > div { display: grid; }.extension-connection-card strong { font-size: 10px; }.extension-connection-card p { margin: 4px 0 0; color: #898c96; font-size: 8px; }
+.extension-connection-actions { display: flex; gap: 6px; }.extension-connection-actions > button { height: 32px; display: inline-flex; align-items: center; gap: 6px; padding: 0 9px; border: 1px solid var(--studio-border); border-radius: 8px; color: #5e567d; background: #fff; font-size: 7.5px; cursor: pointer; }.extension-connection-actions > button:first-child:not(:last-child) { color: #9a5148; }
+.extension-connection-actions > button:disabled { opacity: .55; cursor: wait; }.spinning { animation: extension-spin .8s linear infinite; }@keyframes extension-spin{to{transform:rotate(360deg)}}
+.deploy-primary-actions { display: flex; gap: 7px; }
+.deploy-primary-actions > button { height: 35px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 11px; border: 1px solid #514795; border-radius: 9px; color: #fff; background: #5d50aa; font-size: 8px; font-weight: 650; cursor: pointer; }
+.deploy-primary-actions > button.deploy-run-action { border-color: var(--studio-border); color: #514796; background: #f1efff; }
+.deploy-primary-actions > button:disabled { opacity: .42; cursor: not-allowed; }
+.deploy-input-note { margin-top: 10px; padding: 11px 13px; display: flex; align-items: flex-start; gap: 8px; border: 1px solid #eadcad; border-radius: 11px; color: #756331; background: #fff9e8; }
+.deploy-input-note svg { flex: none; }.deploy-input-note p { margin: 0; font-size: 8px; line-height: 1.5; }.deploy-input-note strong { color: #5f512a; }
+.install-grid--automatic { margin-top: 14px; }
+.extension-capability-card { padding: 17px; border: 1px solid var(--studio-border); border-radius: 14px; background: rgba(255,255,255,.88); }
+.extension-capability-card > header { display: flex; align-items: center; gap: 9px; }.extension-capability-card > header > span { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; color: #6256b0; background: #efedff; }.extension-capability-card > header div { display: grid; }.extension-capability-card > header strong { font-size: 10px; }.extension-capability-card > header p { margin: 3px 0 0; color: #92949d; font-size: 7px; }
+.extension-capability-card > div { margin-top: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }.extension-capability-card > div span { display: flex; align-items: center; gap: 6px; color: #686b75; font-size: 7.5px; }.extension-capability-card > div svg { color: #3d966a; }
+.extension-capability-card > a { width: max-content; height: 34px; margin-top: 18px; display: inline-flex; align-items: center; gap: 7px; padding: 0 10px; border-radius: 9px; color: #fff; background: #24262c; font-size: 8px; font-weight: 650; }
+.manual-deploy-card { margin-top: 14px; border: 1px solid var(--studio-border); border-radius: 14px; background: rgba(255,255,255,.72); overflow: hidden; }.manual-deploy-card > summary { min-height: 48px; padding: 0 15px; display: flex; align-items: center; gap: 8px; color: #686b75; font-size: 8.5px; font-weight: 650; list-style: none; cursor: pointer; }.manual-deploy-card > summary::-webkit-details-marker { display: none; }.manual-deploy-card > summary span { margin-left: auto; color: #786bbf; font-size: 7px; }.manual-deploy-card[open] > summary { border-bottom: 1px solid var(--studio-border); }.manual-deploy-content { padding: 14px; }.manual-deploy-content .install-code-card { margin: 0; }
 .deploy-definition-card pre { height: 280px; }
 .deploy-definition-card .copy-code:disabled { opacity: .4; cursor: default; }
 .deploy-downloads { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -878,5 +895,9 @@
   .browser-live-pipeline { overflow-x: auto; }
   .browser-live-pipeline .live-pipeline-step { min-width: 105px; }
   .deploy-readiness-card { grid-template-columns: 39px 1fr; }
-  .deploy-readiness-card > button { grid-column: 1 / -1; justify-content: center; }
+  .deploy-primary-actions { grid-column: 1 / -1; }
+  .deploy-primary-actions > button { flex: 1; }
+  .extension-connection-card { grid-template-columns: 39px 1fr; }.extension-connection-actions { grid-column: 1 / -1; }.extension-connection-actions > button { flex: 1; justify-content: center; }
 }
+
+@media (max-width: 560px) { .extension-capability-card > div { grid-template-columns: 1fr; }.deploy-primary-actions { flex-direction: column; } }

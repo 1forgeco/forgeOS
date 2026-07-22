@@ -16,10 +16,11 @@ type Identity = { id: string; email: string; name: string; workspaceId: string; 
 const SESSION_COOKIE = 'forgeos_session'
 const SESSION_DAYS = 30
 const PASSWORD_ITERATIONS = 120_000
+const EXTENSION_DEPLOYMENT_MINUTES = 5
 
 const corsHeaders = (request: Request) => ({
   'Access-Control-Allow-Origin': request.headers.get('Origin') ?? '*',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
   'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
   'Vary': 'Origin',
 })
@@ -46,6 +47,15 @@ function base64UrlToBytes(value: string) {
 async function sha256(value: string) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
   return bytesToBase64Url(new Uint8Array(digest))
+}
+
+function randomToken(bytes = 32) {
+  return bytesToBase64Url(crypto.getRandomValues(new Uint8Array(bytes)))
+}
+
+function bearerToken(request: Request) {
+  const authorization = request.headers.get('Authorization') || ''
+  return authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : ''
 }
 
 async function hashPassword(password: string, salt: Uint8Array, iterations = PASSWORD_ITERATIONS) {
@@ -175,6 +185,33 @@ async function requireProductContext(request: Request, env: WorkerEnv) {
   return { identity, db: env.DB }
 }
 
+type ExtensionIdentity = {
+  installationId: string
+  workspaceId: string
+  userId: string
+  extensionVersion: string
+  label: string
+}
+
+async function requireExtensionContext(request: Request, env: WorkerEnv) {
+  if (!env.DB) return { error: json(request, { error: 'Workspace storage is not available.' }, { status: 503 }) }
+  const token = bearerToken(request)
+  if (!token) return { error: json(request, { error: 'Connect the ForgeOS extension again.' }, { status: 401 }) }
+  const tokenHash = await sha256(token)
+  const installation = await env.DB.prepare('SELECT installation_id, workspace_id, user_id, extension_version, label FROM extension_installations WHERE token_hash = ? AND revoked_at IS NULL')
+    .bind(tokenHash).first<{ installation_id: string; workspace_id: string; user_id: string; extension_version: string; label: string }>()
+  if (!installation) return { error: json(request, { error: 'This extension connection is no longer valid.' }, { status: 401 }) }
+  await env.DB.prepare('UPDATE extension_installations SET last_seen_at = CURRENT_TIMESTAMP WHERE installation_id = ?').bind(installation.installation_id).run()
+  const identity: ExtensionIdentity = {
+    installationId: installation.installation_id,
+    workspaceId: installation.workspace_id,
+    userId: installation.user_id,
+    extensionVersion: installation.extension_version,
+    label: installation.label,
+  }
+  return { identity, db: env.DB }
+}
+
 type AgentRow = {
   id: string; workspace_id: string; template_id: string; name: string; status: string; website_url: string; goal: string;
   nodes_json: string; edges_json: string; last_run_at: string | null; created_at: string; updated_at: string
@@ -255,15 +292,172 @@ async function handleDeployAgent(request: Request, env: WorkerEnv, agentId: stri
   if ('error' in context) return context.error
   const agent = await getOwnedAgent(context.db, context.identity.workspaceId, agentId)
   if (!agent) return json(request, { error: 'Agent not found in this workspace.' }, { status: 404 })
-  const body = await request.json() as { definition?: unknown }
+  const body = await request.json() as { definition?: unknown; installationId?: string; autoRun?: boolean }
   if (!body.definition) return json(request, { error: 'Validate the workflow before deploying it.' }, { status: 400 })
+  const installationId = String(body.installationId || '').trim().slice(0, 100)
+  if (!installationId) return json(request, { error: 'Connect the ForgeOS extension before deploying.' }, { status: 409 })
+  const installation = await context.db.prepare('SELECT installation_id FROM extension_installations WHERE installation_id = ? AND workspace_id = ? AND revoked_at IS NULL')
+    .bind(installationId, context.identity.workspaceId).first<{ installation_id: string }>()
+  if (!installation) return json(request, { error: 'Reconnect the ForgeOS extension before deploying.' }, { status: 409 })
   const row = await context.db.prepare('SELECT COALESCE(MAX(version), 0) AS version FROM agent_versions WHERE agent_id = ? AND workspace_id = ?').bind(agentId, context.identity.workspaceId).first<{ version: number }>()
   const version = Number(row?.version || 0) + 1
+  const versionId = crypto.randomUUID()
+  const deploymentToken = randomToken()
+  const deploymentTokenHash = await sha256(deploymentToken)
+  const deploymentId = crypto.randomUUID()
+  const expiresAt = new Date(Date.now() + EXTENSION_DEPLOYMENT_MINUTES * 60_000).toISOString()
   await context.db.batch([
-    context.db.prepare('INSERT INTO agent_versions (id, agent_id, workspace_id, version, definition_json) VALUES (?, ?, ?, ?, ?)').bind(crypto.randomUUID(), agentId, context.identity.workspaceId, version, JSON.stringify(body.definition)),
+    context.db.prepare('INSERT INTO agent_versions (id, agent_id, workspace_id, version, definition_json) VALUES (?, ?, ?, ?, ?)').bind(versionId, agentId, context.identity.workspaceId, version, JSON.stringify(body.definition)),
+    context.db.prepare('INSERT INTO extension_deployments (id, token_hash, installation_id, workspace_id, agent_id, version_id, auto_run, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(deploymentId, deploymentTokenHash, installationId, context.identity.workspaceId, agentId, versionId, body.autoRun ? 1 : 0, expiresAt),
     context.db.prepare("UPDATE agents SET status = 'live', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND workspace_id = ?").bind(agentId, context.identity.workspaceId),
   ])
-  return json(request, { version, status: 'live' })
+  return json(request, {
+    version,
+    status: 'live',
+    deploymentUrl: new URL(`/api/extension/deployments/${encodeURIComponent(deploymentToken)}`, request.url).toString(),
+    expiresAt,
+  })
+}
+
+async function handlePairExtension(request: Request, env: WorkerEnv) {
+  const context = await requireProductContext(request, env)
+  if ('error' in context) return context.error
+  const body = await request.json() as { installationId?: string; extensionVersion?: string; label?: string }
+  const installationId = String(body.installationId || '').trim().slice(0, 100)
+  if (!/^[a-zA-Z0-9:_-]{8,100}$/.test(installationId)) return json(request, { error: 'The extension installation ID is invalid.' }, { status: 400 })
+  const extensionVersion = String(body.extensionVersion || 'unknown').trim().slice(0, 30)
+  const label = String(body.label || 'Chrome extension').trim().slice(0, 80)
+  const pairingToken = randomToken()
+  const tokenHash = await sha256(pairingToken)
+  const id = crypto.randomUUID()
+  await context.db.prepare(`INSERT INTO extension_installations (id, installation_id, workspace_id, user_id, token_hash, extension_version, label)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(installation_id) DO UPDATE SET workspace_id = excluded.workspace_id, user_id = excluded.user_id, token_hash = excluded.token_hash, extension_version = excluded.extension_version, label = excluded.label, last_seen_at = CURRENT_TIMESTAMP, revoked_at = NULL`)
+    .bind(id, installationId, context.identity.workspaceId, context.identity.id, tokenHash, extensionVersion, label).run()
+  return json(request, {
+    pairingToken,
+    workspace: { id: context.identity.workspaceId, name: context.identity.workspaceName },
+    connectedAt: new Date().toISOString(),
+  })
+}
+
+async function handleDisconnectExtension(request: Request, env: WorkerEnv) {
+  const context = await requireProductContext(request, env)
+  if ('error' in context) return context.error
+  const body = await request.json() as { installationId?: string }
+  const installationId = String(body.installationId || '').trim().slice(0, 100)
+  await context.db.prepare('UPDATE extension_installations SET revoked_at = CURRENT_TIMESTAMP, token_hash = ? WHERE installation_id = ? AND workspace_id = ?')
+    .bind(`revoked:${crypto.randomUUID()}`, installationId, context.identity.workspaceId).run()
+  return json(request, { ok: true })
+}
+
+async function handleExtensionDeployment(request: Request, env: WorkerEnv, token: string) {
+  const context = await requireExtensionContext(request, env)
+  if ('error' in context) return context.error
+  const tokenHash = await sha256(token)
+  const row = await context.db.prepare(`SELECT d.id, d.installation_id, d.workspace_id, d.agent_id, d.version_id, d.auto_run, d.expires_at, d.consumed_at,
+    v.version, v.definition_json, v.created_at, a.name, a.website_url, w.name AS workspace_name
+    FROM extension_deployments d
+    JOIN agent_versions v ON v.id = d.version_id
+    JOIN agents a ON a.id = d.agent_id
+    JOIN workspaces w ON w.id = d.workspace_id
+    WHERE d.token_hash = ?`)
+    .bind(tokenHash).first<Record<string, string | number | null>>()
+  if (!row || row.installation_id !== context.identity.installationId || row.workspace_id !== context.identity.workspaceId) {
+    return json(request, { error: 'This deployment does not belong to the connected extension.' }, { status: 403 })
+  }
+  if (row.consumed_at) return json(request, { error: 'This deployment link has already been used.' }, { status: 410 })
+  if (Date.parse(String(row.expires_at)) <= Date.now()) return json(request, { error: 'This deployment link expired. Deploy the agent again.' }, { status: 410 })
+  const snapshot = parseJson<Record<string, unknown>>(String(row.definition_json), {})
+  const definition = (snapshot.runtime && typeof snapshot.runtime === 'object' ? snapshot.runtime : snapshot) as Record<string, unknown>
+  const serializedDefinition = JSON.stringify(definition)
+  await context.db.batch([
+    context.db.prepare('UPDATE extension_deployments SET consumed_at = CURRENT_TIMESTAMP WHERE id = ?').bind(String(row.id)),
+    context.db.prepare('UPDATE extension_installations SET last_seen_at = CURRENT_TIMESTAMP WHERE installation_id = ?').bind(context.identity.installationId),
+  ])
+  return json(request, {
+    agent: {
+      agentId: String(row.agent_id),
+      versionId: String(row.version_id),
+      version: Number(row.version),
+      name: String(row.name),
+      websiteUrl: String(row.website_url),
+      definition,
+      integrity: await sha256(serializedDefinition),
+      publishedAt: String(row.created_at),
+      workspace: { id: String(row.workspace_id), name: String(row.workspace_name) },
+    },
+    autoRun: Boolean(row.auto_run),
+  })
+}
+
+async function handleExtensionAgents(request: Request, env: WorkerEnv) {
+  const context = await requireExtensionContext(request, env)
+  if ('error' in context) return context.error
+  const result = await context.db.prepare(`SELECT a.id AS agent_id, a.name, a.website_url, v.id AS version_id, v.version, v.definition_json, v.created_at
+    FROM agents a JOIN agent_versions v ON v.agent_id = a.id AND v.workspace_id = a.workspace_id
+    WHERE a.workspace_id = ? AND v.version = (SELECT MAX(v2.version) FROM agent_versions v2 WHERE v2.agent_id = a.id AND v2.workspace_id = a.workspace_id)
+    ORDER BY v.created_at DESC`)
+    .bind(context.identity.workspaceId).all<Record<string, string | number>>()
+  const agents = await Promise.all((result.results || []).map(async (row) => {
+    const snapshot = parseJson<Record<string, unknown>>(String(row.definition_json), {})
+    const definition = (snapshot.runtime && typeof snapshot.runtime === 'object' ? snapshot.runtime : snapshot) as Record<string, unknown>
+    return {
+      agentId: String(row.agent_id), versionId: String(row.version_id), version: Number(row.version), name: String(row.name), websiteUrl: String(row.website_url),
+      definition, integrity: await sha256(JSON.stringify(definition)), publishedAt: String(row.created_at),
+    }
+  }))
+  return json(request, { agents })
+}
+
+async function handleExtensionRuns(request: Request, env: WorkerEnv, runId?: string) {
+  const context = await requireExtensionContext(request, env)
+  if ('error' in context) return context.error
+  const body = await request.json() as { agentId?: string; status?: string; goal?: string; result?: string }
+  if (!runId && request.method === 'POST') {
+    const agentId = String(body.agentId || '').slice(0, 100)
+    const agent = await getOwnedAgent(context.db, context.identity.workspaceId, agentId)
+    if (!agent) return json(request, { error: 'Agent not found in the paired workspace.' }, { status: 404 })
+    const id = crypto.randomUUID()
+    await context.db.prepare('INSERT INTO agent_runs (id, agent_id, workspace_id, status, goal, result) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind(id, agentId, context.identity.workspaceId, String(body.status || 'running').slice(0, 30), String(body.goal || agent.goal).slice(0, 5_000), '').run()
+    return json(request, { runId: id }, { status: 201 })
+  }
+  const status = String(body.status || 'completed').slice(0, 30)
+  const completed = ['completed', 'failed', 'stopped'].includes(status)
+  await context.db.prepare(`UPDATE agent_runs SET status = ?, result = ?, completed_at = ${completed ? 'CURRENT_TIMESTAMP' : 'completed_at'} WHERE id = ? AND workspace_id = ?`)
+    .bind(status, String(body.result || '').slice(0, 20_000), String(runId), context.identity.workspaceId).run()
+  return json(request, { ok: true })
+}
+
+async function handleExtensionRunEvent(request: Request, env: WorkerEnv, runId: string) {
+  const context = await requireExtensionContext(request, env)
+  if ('error' in context) return context.error
+  const run = await context.db.prepare('SELECT agent_id FROM agent_runs WHERE id = ? AND workspace_id = ?').bind(runId, context.identity.workspaceId).first<{ agent_id: string }>()
+  if (!run) return json(request, { error: 'Run not found.' }, { status: 404 })
+  const body = await request.json() as { state?: string; title?: string; detail?: string }
+  await context.db.prepare('INSERT INTO agent_run_events (id, run_id, agent_id, workspace_id, state, title, detail) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .bind(crypto.randomUUID(), runId, run.agent_id, context.identity.workspaceId, String(body.state || 'running').slice(0, 30), String(body.title || 'Agent activity').slice(0, 160), String(body.detail || '').slice(0, 5_000)).run()
+  return json(request, { ok: true }, { status: 201 })
+}
+
+async function handleExtensionApproval(request: Request, env: WorkerEnv, approvalId?: string) {
+  const context = await requireExtensionContext(request, env)
+  if ('error' in context) return context.error
+  const body = await request.json() as { runId?: string; agentId?: string; action?: string; details?: string; status?: string }
+  if (!approvalId && request.method === 'POST') {
+    const agent = await getOwnedAgent(context.db, context.identity.workspaceId, String(body.agentId || ''))
+    if (!agent) return json(request, { error: 'Agent not found.' }, { status: 404 })
+    const id = crypto.randomUUID()
+    await context.db.prepare('INSERT INTO approval_requests (id, run_id, agent_id, workspace_id, action, details) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind(id, String(body.runId || ''), agent.id, context.identity.workspaceId, String(body.action || 'Protected action').slice(0, 160), String(body.details || '').slice(0, 3_000)).run()
+    return json(request, { approvalId: id }, { status: 201 })
+  }
+  const status = body.status === 'approved' ? 'approved' : 'rejected'
+  await context.db.prepare('UPDATE approval_requests SET status = ?, resolved_at = CURRENT_TIMESTAMP WHERE id = ? AND workspace_id = ?')
+    .bind(status, String(approvalId), context.identity.workspaceId).run()
+  return json(request, { ok: true })
 }
 
 async function handleVersions(request: Request, env: WorkerEnv, agentId: string, restoreVersion?: number) {
@@ -359,6 +553,19 @@ export default {
       if (url.pathname === '/api/auth/login' && request.method === 'POST') return await handleLogin(request, env)
       if (url.pathname === '/api/auth/logout' && request.method === 'POST') return await handleLogout(request, env)
       if (url.pathname === '/api/account' && request.method === 'GET') return await handleAccount(request, env)
+      if (url.pathname === '/api/extension/pair' && request.method === 'POST') return await handlePairExtension(request, env)
+      if (url.pathname === '/api/extension/pair' && request.method === 'DELETE') return await handleDisconnectExtension(request, env)
+      if (url.pathname === '/api/extension/agents' && request.method === 'GET') return await handleExtensionAgents(request, env)
+      const extensionDeploymentMatch = url.pathname.match(/^\/api\/extension\/deployments\/([^/]+)$/)
+      if (extensionDeploymentMatch && request.method === 'GET') return await handleExtensionDeployment(request, env, decodeURIComponent(extensionDeploymentMatch[1]))
+      if (url.pathname === '/api/extension/runs' && request.method === 'POST') return await handleExtensionRuns(request, env)
+      const extensionRunMatch = url.pathname.match(/^\/api\/extension\/runs\/([^/]+)$/)
+      if (extensionRunMatch && request.method === 'PATCH') return await handleExtensionRuns(request, env, decodeURIComponent(extensionRunMatch[1]))
+      const extensionRunEventMatch = url.pathname.match(/^\/api\/extension\/runs\/([^/]+)\/events$/)
+      if (extensionRunEventMatch && request.method === 'POST') return await handleExtensionRunEvent(request, env, decodeURIComponent(extensionRunEventMatch[1]))
+      if (url.pathname === '/api/extension/approvals' && request.method === 'POST') return await handleExtensionApproval(request, env)
+      const extensionApprovalMatch = url.pathname.match(/^\/api\/extension\/approvals\/([^/]+)$/)
+      if (extensionApprovalMatch && request.method === 'PATCH') return await handleExtensionApproval(request, env, decodeURIComponent(extensionApprovalMatch[1]))
       if (url.pathname === '/api/agents' && ['GET', 'POST'].includes(request.method)) return await handleAgents(request, env)
       const agentMatch = url.pathname.match(/^\/api\/agents\/([^/]+)$/)
       if (agentMatch && ['GET', 'PATCH', 'DELETE'].includes(request.method)) return await handleSingleAgent(request, env, decodeURIComponent(agentMatch[1]))

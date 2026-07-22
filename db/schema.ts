@@ -74,6 +74,43 @@ export const agentRuns = sqliteTable('agent_runs', {
   completedAt: text('completed_at'),
 })
 
+export const agentRunEvents = sqliteTable('agent_run_events', {
+  id: text('id').primaryKey(),
+  runId: text('run_id').notNull(),
+  agentId: text('agent_id').notNull(),
+  workspaceId: text('workspace_id').notNull(),
+  state: text('state').notNull(),
+  title: text('title').notNull(),
+  detail: text('detail').notNull(),
+  createdAt: text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+})
+
+export const extensionInstallations = sqliteTable('extension_installations', {
+  id: text('id').primaryKey(),
+  installationId: text('installation_id').notNull(),
+  workspaceId: text('workspace_id').notNull(),
+  userId: text('user_id').notNull(),
+  tokenHash: text('token_hash').notNull(),
+  extensionVersion: text('extension_version').notNull(),
+  label: text('label').notNull().default('Chrome extension'),
+  lastSeenAt: text('last_seen_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+  revokedAt: text('revoked_at'),
+  createdAt: text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [uniqueIndex('extension_installations_installation_unique').on(table.installationId)])
+
+export const extensionDeployments = sqliteTable('extension_deployments', {
+  id: text('id').primaryKey(),
+  tokenHash: text('token_hash').notNull(),
+  installationId: text('installation_id').notNull(),
+  workspaceId: text('workspace_id').notNull(),
+  agentId: text('agent_id').notNull(),
+  versionId: text('version_id').notNull(),
+  autoRun: integer('auto_run', { mode: 'boolean' }).notNull().default(false),
+  expiresAt: text('expires_at').notNull(),
+  consumedAt: text('consumed_at'),
+  createdAt: text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+})
+
 export const approvalRequests = sqliteTable('approval_requests', {
   id: text('id').primaryKey(),
   runId: text('run_id'),

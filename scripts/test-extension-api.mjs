@@ -25,6 +25,20 @@ const registered = await request('/api/auth/register', {
 const cookie = registered.response.headers.get('set-cookie')?.split(';')[0]
 if (!cookie) throw new Error('Registration did not return a session cookie.')
 
+const accountUpdated = await request('/api/account', {
+  method: 'PATCH', cookie,
+  body: JSON.stringify({ name: 'Extension Test Owner', workspaceName: 'Protocol workspace' }),
+})
+if (accountUpdated.body.user.name !== 'Extension Test Owner' || accountUpdated.body.workspace.name !== 'Protocol workspace') throw new Error('Account details did not persist.')
+await request('/api/settings', {
+  method: 'PATCH', cookie,
+  body: JSON.stringify({ settings: { safety: { askBeforeSubmit: true, stopForAuthentication: true, blockPaymentDetails: true, stopAfterRepeatedFailure: true }, notifications: { approvals: true, failedRuns: true, successfulRuns: true } } }),
+})
+const settings = await request('/api/settings', { cookie })
+if (!settings.body.settings.notifications.successfulRuns) throw new Error('Workspace settings did not persist.')
+const emptyDashboard = await request('/api/dashboard', { cookie })
+if (emptyDashboard.body.agents !== 0) throw new Error('New workspace dashboard was not empty.')
+
 const created = await request('/api/agents', {
   method: 'POST', cookie, expected: 201,
   body: JSON.stringify({ templateId: 'custom-browser', name: 'Extension protocol test', websiteUrl: 'https://example.com', goal: 'Find example results', nodes: [], edges: [] }),
@@ -68,7 +82,19 @@ await request(`/api/extension/runs/${started.body.runId}/events`, { method: 'POS
 const approval = await request('/api/extension/approvals', { method: 'POST', token: pairingToken, expected: 201, body: JSON.stringify({ runId: started.body.runId, agentId, action: 'Submit form', details: 'Integration approval' }) })
 await request(`/api/extension/approvals/${approval.body.approvalId}`, { method: 'PATCH', token: pairingToken, body: JSON.stringify({ status: 'approved' }) })
 await request(`/api/extension/runs/${started.body.runId}`, { method: 'PATCH', token: pairingToken, body: JSON.stringify({ status: 'completed', result: 'Protocol verified.' }) })
-await request('/api/extension/pair', { method: 'DELETE', cookie, body: JSON.stringify({ installationId }) })
+const runDetail = await request(`/api/runs/${started.body.runId}`, { cookie })
+if (runDetail.body.run.events.length !== 1 || runDetail.body.run.approvals.length !== 1 || runDetail.body.run.status !== 'completed') throw new Error('Run detail did not include its persisted activity and approval.')
+const dashboard = await request('/api/dashboard', { cookie })
+if (dashboard.body.agents !== 1 || dashboard.body.runsThisMonth !== 1 || dashboard.body.connectedExtensions !== 1) throw new Error('Dashboard counts did not reflect persisted activity.')
+const exported = await request('/api/account/export', { cookie })
+if (exported.body.agents.length !== 1 || exported.body.runs.length !== 1 || !exported.body.preferences) throw new Error('Workspace export was incomplete.')
+const passwordChanged = await request('/api/account/password', {
+  method: 'POST', cookie,
+  body: JSON.stringify({ currentPassword: 'forgeos-test-password', newPassword: 'forgeos-test-password-updated' }),
+})
+const refreshedCookie = passwordChanged.response.headers.get('set-cookie')?.split(';')[0]
+if (!refreshedCookie) throw new Error('Password change did not rotate the session.')
+await request('/api/extension/pair', { method: 'DELETE', cookie: refreshedCookie, body: JSON.stringify({ installationId }) })
 await request('/api/extension/agents', { token: pairingToken, expected: 401 })
 
-process.stdout.write(JSON.stringify({ ok: true, agentId, version: deployed.body.version, runId: started.body.runId, singleUseToken: 'verified', sync: 'verified', approvals: 'verified', revocation: 'verified' }, null, 2))
+process.stdout.write(JSON.stringify({ ok: true, agentId, version: deployed.body.version, runId: started.body.runId, singleUseToken: 'verified', sync: 'verified', approvals: 'verified', runDetail: 'verified', settings: 'verified', export: 'verified', passwordRotation: 'verified', revocation: 'verified' }, null, 2))

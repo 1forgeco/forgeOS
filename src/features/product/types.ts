@@ -19,6 +19,9 @@ export type AgentTemplate = {
   defaultUrl: string
   defaultGoal: string
   defaultInputs: string
+  runtimeMode: string
+  requiredConnections: string[]
+  approvalDefaults: string
 }
 
 export type StoredAgent = {
@@ -55,10 +58,42 @@ export type AgentRunRecord = {
 
 export type ApprovalRecord = {
   id: string
+  runId?: string | null
   agentId: string
   agentName: string
+  websiteUrl?: string
   action: string
   details: string
   status: string
   createdAt: string
+  resolvedAt?: string | null
+}
+
+export type WorkspaceSettings = {
+  safety: {
+    askBeforeSubmit: boolean
+    stopForAuthentication: boolean
+    blockPaymentDetails: boolean
+    stopAfterRepeatedFailure: boolean
+  }
+  notifications: {
+    approvals: boolean
+    failedRuns: boolean
+    successfulRuns: boolean
+  }
+}
+
+export type DashboardSummary = {
+  agents: number
+  liveAgents: number
+  runsThisMonth: number
+  pendingApprovals: number
+  connectedExtensions: number
+  reasoningReady: boolean
+}
+
+export type RunDetail = AgentRunRecord & {
+  websiteUrl: string
+  events: Array<{ id: string; state: string; title: string; detail: string; createdAt: string }>
+  approvals: Array<{ id: string; action: string; details: string; status: string; createdAt: string; resolvedAt?: string | null }>
 }

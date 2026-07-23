@@ -1,5 +1,7 @@
-import { Info, Settings2, Trash2, X } from 'lucide-react'
+import { Check, Info, Plus, Settings2, Trash2, X } from 'lucide-react'
+import { useState, type KeyboardEvent } from 'react'
 import { NODE_REGISTRY } from '../data/nodeRegistry'
+import type { ConfigField } from '../data/nodeRegistry'
 import type { AgentNode, AgentNodeData, NodeConfig } from '../types'
 
 type InspectorPanelProps = {
@@ -7,6 +9,40 @@ type InspectorPanelProps = {
   onChange: (data: AgentNodeData) => void
   onDelete: () => void
   onClose: () => void
+}
+
+function items(value: string) {
+  return value.split(',').map((item) => item.trim()).filter(Boolean)
+}
+
+function TagEditor({ field, value, onChange }: { field: ConfigField; value: string; onChange: (value: string) => void }) {
+  const [draft, setDraft] = useState('')
+  const current = items(value)
+  const add = () => {
+    const next = draft.trim()
+    if (!next || current.some((item) => item.toLowerCase() === next.toLowerCase())) return
+    onChange([...current, next].join(', '))
+    setDraft('')
+  }
+  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter' || event.key === ',') {
+      event.preventDefault()
+      add()
+    }
+  }
+  return <div className="tag-editor">
+    <div className="tag-editor-items">{current.map((item) => <button type="button" key={item} onClick={() => onChange(current.filter((value) => value !== item).join(', '))} title={`Remove ${item}`}><span>{item}</span><X size={10} /></button>)}</div>
+    <div className="tag-editor-add"><input value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={onKeyDown} placeholder={field.placeholder || 'Add another'} /><button type="button" onClick={add} disabled={!draft.trim()}><Plus size={12} /> Add</button></div>
+  </div>
+}
+
+function MultiSelect({ field, value, onChange }: { field: ConfigField; value: string; onChange: (value: string) => void }) {
+  const current = items(value)
+  const toggle = (option: string) => onChange(current.includes(option) ? current.filter((item) => item !== option).join(', ') : [...current, option].join(', '))
+  return <div className="choice-grid">{field.options?.map((option) => {
+    const selected = current.includes(option.value)
+    return <button type="button" className={selected ? 'selected' : ''} aria-pressed={selected} onClick={() => toggle(option.value)} key={option.value}>{selected ? <Check size={11} /> : <Plus size={11} />}<span>{option.label}</span></button>
+  })}</div>
 }
 
 export function InspectorPanel({ node, onChange, onDelete, onClose }: InspectorPanelProps) {
@@ -52,7 +88,11 @@ export function InspectorPanel({ node, onChange, onDelete, onClose }: InspectorP
         {definition.fields.map((field) => (
           <label key={field.key}>
             <span>{field.label}</span>
-            {field.type === 'textarea' ? (
+            {field.type === 'taglist' ? <TagEditor field={field} value={String(node.data.config[field.key] ?? '')} onChange={(value) => updateConfig(field.key, value)} /> : field.type === 'multiselect' ? <MultiSelect field={field} value={String(node.data.config[field.key] ?? '')} onChange={(value) => updateConfig(field.key, value)} /> : field.type === 'select' ? (
+              <select value={String(node.data.config[field.key] ?? '')} onChange={(event) => updateConfig(field.key, event.target.value)}>
+                {field.options?.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
+              </select>
+            ) : field.type === 'textarea' ? (
               <textarea rows={4} value={String(node.data.config[field.key] ?? '')} onChange={(event) => updateConfig(field.key, event.target.value)} />
             ) : (
               <input value={String(node.data.config[field.key] ?? '')} onChange={(event) => updateConfig(field.key, event.target.value)} />

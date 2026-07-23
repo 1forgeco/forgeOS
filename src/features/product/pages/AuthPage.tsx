@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Bot, Check, LockKeyhole, Mail, ShieldCheck, Sparkles, UserRound } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Bot, Check, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, Sparkles, UserRound } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
@@ -20,6 +20,8 @@ export function AuthPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState({ name: '', email: '', password: '' })
+  const [showPassword, setShowPassword] = useState(false)
+  const passwordStrength = form.password.length >= 12 && /[A-Z]/.test(form.password) && /\d/.test(form.password) ? 'Strong' : form.password.length >= 8 ? 'Good' : 'Needs 8+ characters'
 
   useEffect(() => {
     productApi.session().then(setSession).catch(() => setSession(null)).finally(() => setChecking(false))
@@ -74,7 +76,8 @@ export function AuthPage() {
         <form onSubmit={(event) => void submit(event)}>
           {mode === 'register' && <label><span>Full name</span><div><UserRound size={15} /><input autoComplete="name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Your name" required minLength={2} /></div></label>}
           <label><span>Email address</span><div><Mail size={15} /><input type="email" autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} placeholder="you@company.com" required /></div></label>
-          <label><span>Password</span><div><LockKeyhole size={15} /><input type="password" autoComplete={mode === 'register' ? 'new-password' : 'current-password'} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} placeholder={mode === 'register' ? 'At least 8 characters' : 'Your password'} required minLength={8} maxLength={128} /></div></label>
+          <label><span>Password</span><div className="auth-password-field"><LockKeyhole size={15} /><input type={showPassword ? 'text' : 'password'} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} placeholder={mode === 'register' ? 'At least 8 characters' : 'Your password'} required minLength={8} maxLength={128} /><button type="button" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff size={15} /> : <Eye size={15} />}</button></div>{mode === 'register' && <small className={`password-strength ${passwordStrength.toLowerCase().replace(/\s+/g, '-')}`}>{passwordStrength}</small>}</label>
+          {mode === 'login' && <a className="forgot-password" href={`mailto:studio@1forge.in?subject=ForgeOS password recovery&body=Account email: ${encodeURIComponent(form.email)}`}>Forgot your password?</a>}
           {error && <p className="auth-error" role="alert">{error}</p>}
           <button className="auth-submit" disabled={saving || checking}>{saving ? 'Please wait…' : mode === 'login' ? 'Sign in to ForgeOS' : 'Create account'} {!saving && <ArrowRight size={15} />}</button>
         </form>

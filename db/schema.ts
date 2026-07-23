@@ -132,6 +132,12 @@ export const workspaceConnections = sqliteTable('workspace_connections', {
   updatedAt: text('updated_at').notNull().default(sql`CURRENT_TIMESTAMP`),
 })
 
+export const workspacePreferences = sqliteTable('workspace_preferences', {
+  workspaceId: text('workspace_id').primaryKey(),
+  settingsJson: text('settings_json').notNull(),
+  updatedAt: text('updated_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+})
+
 export const agentMessages = sqliteTable('agent_messages', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   sessionId: text('session_id').notNull(),

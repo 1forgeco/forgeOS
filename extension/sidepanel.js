@@ -9,6 +9,7 @@ const agentSection = document.querySelector('#agent')
 const activity = document.querySelector('#activity')
 const events = document.querySelector('#events')
 const approvalCard = document.querySelector('#approval-card')
+const researchResult = document.querySelector('#research-result')
 
 function activeAgent() {
   return agents.find((item) => item.agentId === activeAgentId) || agents[0] || null
@@ -94,6 +95,41 @@ function setRunState(state) {
   document.querySelector('#run').disabled = active
 }
 
+function renderResearchResult(raw) {
+  let result
+  try { result = typeof raw === 'string' ? JSON.parse(raw) : raw } catch { return }
+  if (result?.type !== 'forgeos-product-research' || !Array.isArray(result.recommendations)) return
+  text(document.querySelector('#research-summary'), result.summary)
+  text(document.querySelector('#research-note'), result.note)
+  const recommendations = document.querySelector('#recommendations')
+  recommendations.replaceChildren(...result.recommendations.map((item) => {
+    const article = document.createElement('article')
+    const label = document.createElement('span')
+    label.textContent = item.label
+    const title = document.createElement('a')
+    title.href = item.url
+    title.target = '_blank'
+    title.textContent = item.title
+    const metrics = document.createElement('div')
+    for (const value of [item.price, item.rating, item.reviews]) {
+      const metric = document.createElement('b')
+      metric.textContent = value
+      metrics.append(metric)
+    }
+    const reasons = document.createElement('ul')
+    for (const reason of (item.reasons || []).slice(0, 4)) {
+      const row = document.createElement('li')
+      row.textContent = reason
+      reasons.append(row)
+    }
+    const date = document.createElement('small')
+    date.textContent = item.launchDate && item.launchDate !== 'Not found on page' ? `Launch evidence: ${item.launchDate}` : 'Launch date was not exposed on the page'
+    article.append(label, title, metrics, reasons, date)
+    return article
+  }))
+  researchResult.hidden = false
+}
+
 document.querySelector('#sync').addEventListener('click', async () => {
   const button = document.querySelector('#sync')
   button.classList.add('spinning')
@@ -110,6 +146,7 @@ document.querySelector('#run').addEventListener('click', () => {
   const missing = item.definition.inputs.filter((field) => !String(inputs[field] || '').trim())
   if (missing.length) { window.alert(`Enter ${missing.join(', ')} before running.`); return }
   events.replaceChildren()
+  researchResult.hidden = true
   activity.hidden = false
   setRunState('Running')
   chrome.action.setBadgeText({ text: '' }).catch(() => {})
@@ -195,15 +232,22 @@ chrome.runtime.onMessage.addListener((message) => {
     setRunState('Needs approval')
   } else if (message.state === 'error' || message.state === 'stopped') setRunState('Stopped')
   else if (message.state === 'takeover') setRunState('Needs you')
-  else if (message.state === 'completed') setRunState('Completed')
+  else if (message.state === 'completed') {
+    setRunState('Completed')
+    if (message.result) renderResearchResult(message.result)
+  }
   else if (message.state === 'paused') setRunState('Paused')
   else if (message.state === 'running' || message.state === 'done') setRunState('Running')
 })
 
-chrome.storage.local.get(['forgeosAgents', 'forgeosActiveAgentId', 'forgeosWorkspace', 'forgeosApiBase']).then((stored) => {
+chrome.storage.local.get(['forgeosAgents', 'forgeosActiveAgentId', 'forgeosWorkspace', 'forgeosApiBase', 'forgeosAppBase']).then((stored) => {
   agents = Array.isArray(stored.forgeosAgents) ? stored.forgeosAgents : []
   activeAgentId = stored.forgeosActiveAgentId || agents[0]?.agentId || null
   text(document.querySelector('#connection'), stored.forgeosWorkspace ? `Connected · ${stored.forgeosWorkspace.name}` : 'Browser agent')
-  if (stored.forgeosApiBase) document.querySelector('#open-forgeos').href = `${stored.forgeosApiBase}/projects`
+  const appBase = stored.forgeosAppBase || stored.forgeosApiBase
+  if (appBase) {
+    document.querySelector('#open-forgeos').href = `${appBase}${stored.forgeosWorkspace ? '/projects' : '/playground'}`
+    document.querySelector('#open-forgeos').textContent = stored.forgeosWorkspace ? 'Open workspace' : 'Open playground'
+  }
   renderLibrary()
 })

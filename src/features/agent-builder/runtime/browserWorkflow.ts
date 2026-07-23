@@ -88,6 +88,8 @@ export function compileBrowserWorkflow(name: string, nodes: AgentNode[], edges: 
       allowedDomains: list(text(websiteNode, 'allowedDomains')).length > 0 ? list(text(websiteNode, 'allowedDomains')) : [hostname],
       goal: text(goalNode, 'goal'),
       completionCriteria: text(goalNode, 'completionCriteria'),
+      runtimeMode: (['general', 'product-research', 'executive-assistant', 'social-media', 'sales-outreach', 'seo-writer', 'receptionist', 'legal-assistant'].includes(text(agentNode, 'runtimeMode')) ? text(agentNode, 'runtimeMode') : 'general') as BrowserWorkflowDefinition['runtimeMode'],
+      agentInstructions: text(agentNode, 'instructions'),
       inputs: list(text(inputNode, 'fields')),
       allowedActions: list(text(agentNode, 'allowedActions')),
       approvalActions: list(text(approvalNode, 'approvalActions')),

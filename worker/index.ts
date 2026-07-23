@@ -1,4 +1,5 @@
 import { runBookingTurn, type BookingAgentResponse, type BookingSession } from '../src/features/agent-builder/runtime/bookingAgent'
+import { executeReasoningAgent } from './agentRuntime'
 
 type D1Result<T = Record<string, unknown>> = { results?: T[] }
 type D1PreparedStatement = {
@@ -8,7 +9,13 @@ type D1PreparedStatement = {
   all: <T = Record<string, unknown>>() => Promise<D1Result<T>>
 }
 type D1Database = { prepare: (query: string) => D1PreparedStatement; batch: (statements: D1PreparedStatement[]) => Promise<unknown> }
-type WorkerEnv = { ASSETS: { fetch: (request: Request) => Promise<Response> }; DB?: D1Database }
+type WorkerEnv = {
+  ASSETS: { fetch: (request: Request) => Promise<Response>
+  }
+  DB?: D1Database
+  OPENAI_API_KEY?: string
+  OPENAI_MODEL?: string
+}
 
 type ChatPayload = { message?: string; session?: BookingSession; sessionId?: string }
 type Identity = { id: string; email: string; name: string; workspaceId: string; workspaceName: string }
@@ -287,6 +294,34 @@ async function handleSingleAgent(request: Request, env: WorkerEnv, agentId: stri
   return json(request, { agent: updated ? mapAgent(updated) : null })
 }
 
+async function handleExecuteAgent(request: Request, env: WorkerEnv, agentId: string) {
+  const context = await requireProductContext(request, env)
+  if ('error' in context) return context.error
+  const agent = await getOwnedAgent(context.db, context.identity.workspaceId, agentId)
+  if (!agent) return json(request, { error: 'Agent not found in this workspace.' }, { status: 404 })
+  let body: { inputs?: Record<string, string> }
+  try { body = await request.json() as typeof body } catch { return json(request, { error: 'Send the agent inputs as valid JSON.' }, { status: 400 }) }
+  const inputs = Object.fromEntries(Object.entries(body.inputs || {}).slice(0, 40).map(([key, value]) => [key.slice(0, 120), String(value || '').slice(0, 20_000)]))
+  const runId = crypto.randomUUID()
+  await context.db.prepare('INSERT INTO agent_runs (id, agent_id, workspace_id, status, goal) VALUES (?, ?, ?, ?, ?)')
+    .bind(runId, agent.id, context.identity.workspaceId, 'running', agent.goal).run()
+  try {
+    const result = await executeReasoningAgent(
+      { apiKey: env.OPENAI_API_KEY, model: env.OPENAI_MODEL },
+      { templateId: agent.template_id, name: agent.name, goal: agent.goal, websiteUrl: agent.website_url, inputs },
+    )
+    await context.db.batch([
+      context.db.prepare("UPDATE agent_runs SET status = 'completed', result = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ? AND workspace_id = ?").bind(result.text, runId, context.identity.workspaceId),
+      context.db.prepare('UPDATE agents SET last_run_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND workspace_id = ?').bind(agent.id, context.identity.workspaceId),
+    ])
+    return json(request, { runId, result })
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'The agent reasoning run failed.'
+    await context.db.prepare("UPDATE agent_runs SET status = 'failed', result = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ? AND workspace_id = ?").bind(detail, runId, context.identity.workspaceId).run()
+    return json(request, { error: detail, runId }, { status: env.OPENAI_API_KEY ? 502 : 503 })
+  }
+}
+
 async function handleDeployAgent(request: Request, env: WorkerEnv, agentId: string) {
   const context = await requireProductContext(request, env)
   if ('error' in context) return context.error
@@ -431,6 +466,28 @@ async function handleExtensionRuns(request: Request, env: WorkerEnv, runId?: str
   return json(request, { ok: true })
 }
 
+async function handleExtensionReason(request: Request, env: WorkerEnv) {
+  const context = await requireExtensionContext(request, env)
+  if ('error' in context) return context.error
+  let body: { agentId?: string; inputs?: Record<string, string>; pageEvidence?: string }
+  try { body = await request.json() as typeof body } catch { return json(request, { error: 'Send valid reasoning input.' }, { status: 400 }) }
+  const agentId = String(body.agentId || '').slice(0, 100)
+  const agent = await getOwnedAgent(context.db, context.identity.workspaceId, agentId)
+  if (!agent) return json(request, { error: 'The installed agent is no longer available in this workspace.' }, { status: 404 })
+  const inputs = Object.fromEntries(Object.entries(body.inputs || {}).slice(0, 40).map(([key, value]) => [key.slice(0, 120), String(value || '').slice(0, 20_000)]))
+  if (body.pageEvidence) inputs['visible browser evidence'] = String(body.pageEvidence).slice(0, 40_000)
+  try {
+    const result = await executeReasoningAgent(
+      { apiKey: env.OPENAI_API_KEY, model: env.OPENAI_MODEL },
+      { templateId: agent.template_id, name: agent.name, goal: agent.goal, websiteUrl: agent.website_url, inputs },
+    )
+    return json(request, { result })
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'The specialist reasoning step failed.'
+    return json(request, { error: detail }, { status: env.OPENAI_API_KEY ? 502 : 503 })
+  }
+}
+
 async function handleExtensionRunEvent(request: Request, env: WorkerEnv, runId: string) {
   const context = await requireExtensionContext(request, env)
   if ('error' in context) return context.error
@@ -559,6 +616,7 @@ export default {
       const extensionDeploymentMatch = url.pathname.match(/^\/api\/extension\/deployments\/([^/]+)$/)
       if (extensionDeploymentMatch && request.method === 'GET') return await handleExtensionDeployment(request, env, decodeURIComponent(extensionDeploymentMatch[1]))
       if (url.pathname === '/api/extension/runs' && request.method === 'POST') return await handleExtensionRuns(request, env)
+      if (url.pathname === '/api/extension/reason' && request.method === 'POST') return await handleExtensionReason(request, env)
       const extensionRunMatch = url.pathname.match(/^\/api\/extension\/runs\/([^/]+)$/)
       if (extensionRunMatch && request.method === 'PATCH') return await handleExtensionRuns(request, env, decodeURIComponent(extensionRunMatch[1]))
       const extensionRunEventMatch = url.pathname.match(/^\/api\/extension\/runs\/([^/]+)\/events$/)
@@ -569,6 +627,8 @@ export default {
       if (url.pathname === '/api/agents' && ['GET', 'POST'].includes(request.method)) return await handleAgents(request, env)
       const agentMatch = url.pathname.match(/^\/api\/agents\/([^/]+)$/)
       if (agentMatch && ['GET', 'PATCH', 'DELETE'].includes(request.method)) return await handleSingleAgent(request, env, decodeURIComponent(agentMatch[1]))
+      const executeAgentMatch = url.pathname.match(/^\/api\/agents\/([^/]+)\/execute$/)
+      if (executeAgentMatch && request.method === 'POST') return await handleExecuteAgent(request, env, decodeURIComponent(executeAgentMatch[1]))
       const deployMatch = url.pathname.match(/^\/api\/agents\/([^/]+)\/deploy$/)
       if (deployMatch && request.method === 'POST') return await handleDeployAgent(request, env, decodeURIComponent(deployMatch[1]))
       const versionsMatch = url.pathname.match(/^\/api\/agents\/([^/]+)\/versions$/)

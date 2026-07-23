@@ -1,4 +1,4 @@
-import { ArrowUpRight, Bot, Check, CircleStop, Globe2, LoaderCircle, Play, RotateCcw, ShieldCheck, UserRound } from 'lucide-react'
+import { AlertCircle, ArrowUpRight, Bot, Check, CircleStop, ExternalLink, Globe2, LoaderCircle, Play, RotateCcw, ShieldCheck, Sparkles, UserRound } from 'lucide-react'
 import { useMemo, useRef, useState, type CSSProperties } from 'react'
 import { NODE_REGISTRY } from '../data/nodeRegistry'
 import { buildRunDetails, compileBrowserWorkflow } from '../runtime/browserWorkflow'
@@ -22,6 +22,8 @@ export function TestAgentPanel({ agentId, title, nodes, edges, onActivity }: Tes
   const [events, setEvents] = useState<BrowserEvent[]>([])
   const [running, setRunning] = useState(false)
   const [runComplete, setRunComplete] = useState(false)
+  const [agentResult, setAgentResult] = useState<{ text: string; model: string; citations: Array<{ url: string; title: string }> } | null>(null)
+  const [runError, setRunError] = useState('')
   const stopRequested = useRef(false)
 
   const reset = () => {
@@ -29,6 +31,8 @@ export function TestAgentPanel({ agentId, title, nodes, edges, onActivity }: Tes
     setEvents([])
     setRunning(false)
     setRunComplete(false)
+    setAgentResult(null)
+    setRunError('')
     onActivity([])
   }
 
@@ -37,6 +41,8 @@ export function TestAgentPanel({ agentId, title, nodes, edges, onActivity }: Tes
     stopRequested.current = false
     setRunning(true)
     setRunComplete(false)
+    setAgentResult(null)
+    setRunError('')
     setEvents([])
     const details = buildRunDetails(definition, inputs)
     const primary = compiled.orderedNodes.filter((node) => node.data.kind !== 'humanTakeover')
@@ -51,10 +57,27 @@ export function TestAgentPanel({ agentId, title, nodes, edges, onActivity }: Tes
       setEvents((current) => current.map((event) => event.id === id ? { ...event, detail: details[node.data.kind], state: 'done' } : event))
     }
 
-    if (!stopRequested.current) {
+    let reasoningSucceeded = true
+    if (!stopRequested.current && agentId) {
+      const reasoningEventId = `reasoning-${Date.now()}`
+      setEvents((current) => [...current, { id: reasoningEventId, title: 'Advanced reasoning', detail: 'Producing the real agent output from your inputs…', state: 'running' }])
+      try {
+        const response = await productApi.executeAgent(agentId, inputs)
+        if (!stopRequested.current) {
+          setAgentResult(response.result)
+          setEvents((current) => current.map((event) => event.id === reasoningEventId ? { ...event, detail: `Completed with ${response.result.model}.`, state: 'done' } : event))
+        }
+      } catch (cause) {
+        reasoningSucceeded = false
+        const message = cause instanceof Error ? cause.message : 'The advanced reasoning run failed.'
+        setRunError(message)
+        setEvents((current) => current.filter((event) => event.id !== reasoningEventId))
+      }
+    }
+
+    if (!stopRequested.current && reasoningSucceeded) {
       setRunComplete(true)
       onActivity(primary.map((node) => node.data.kind))
-      if (agentId) void productApi.recordRun(agentId, { status: 'completed', goal: definition.goal, result: 'Workflow validation completed successfully.' })
     }
     setRunning(false)
   }
@@ -129,7 +152,9 @@ export function TestAgentPanel({ agentId, title, nodes, edges, onActivity }: Tes
           <div className="browser-event-list">
             {events.map((event) => <div className={`browser-event ${event.state}`} key={event.id}><span>{event.state === 'running' ? <LoaderCircle size={13} /> : <Check size={13} />}</span><div><strong>{event.title}</strong><p>{event.detail}</p></div></div>)}
           </div>
-          <div className="browser-test-truth"><UserRound size={14} /><p><strong>Browser control is deliberately separate.</strong> Install the ForgeOS extension to let a deployed agent inspect and act on external tabs. This web test never claims to control a page it cannot access.</p></div>
+          {runError && <div className="agent-test-error"><AlertCircle size={15} /><div><strong>The live reasoning step needs setup</strong><p>{runError}</p></div></div>}
+          {agentResult && <section className="agent-test-result"><header><span><Sparkles size={13} /> Agent result</span><small>{agentResult.model}</small></header><pre>{agentResult.text}</pre>{agentResult.citations.length > 0 && <div className="agent-result-citations">{agentResult.citations.map((citation) => <a href={citation.url} target="_blank" rel="noreferrer" key={citation.url}>{citation.title}<ExternalLink size={10} /></a>)}</div>}</section>}
+          <div className="browser-test-truth"><UserRound size={14} /><p><strong>Actions stay separate from reasoning.</strong> The test above produces a real model result when the server key is configured. Deploy to the ForgeOS extension for approved browser actions; email, calendar, publishing, and phone actions also need their own workspace connection.</p></div>
         </aside>
       </div>
     </main>

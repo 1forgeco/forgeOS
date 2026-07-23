@@ -1,4 +1,4 @@
-import { ArrowRight, Bot, Check, Circle, GripVertical, Plus, Radio, Search } from 'lucide-react'
+import { ArrowRight, Bot, Check, ChevronDown, Circle, GripVertical, Plus, Radio, Search } from 'lucide-react'
 import { useMemo, useState, type DragEvent } from 'react'
 import { NODE_GROUPS, NODE_REGISTRY } from '../data/nodeRegistry'
 import type { AgentNodeKind } from '../types'
@@ -7,9 +7,14 @@ type NodePaletteProps = {
   onAdd: (kind: AgentNodeKind) => void
   onOpenTest: () => void
   onOpenInstall: () => void
+  onOpenAdd: () => void
+  onFocusKind: (kind: AgentNodeKind) => void
+  existingKinds: AgentNodeKind[]
 }
 
-export function NodePalette({ onAdd, onOpenTest, onOpenInstall }: NodePaletteProps) {
+const QUICK_KINDS: AgentNodeKind[] = ['targetWebsite', 'taskGoal', 'requiredInputs', 'browserAgent', 'approvalGate', 'returnResult']
+
+export function NodePalette({ onAdd, onOpenTest, onOpenInstall, onOpenAdd, onFocusKind, existingKinds }: NodePaletteProps) {
   const [query, setQuery] = useState('')
   const groups = useMemo(() => {
     const normalized = query.trim().toLowerCase()
@@ -46,9 +51,21 @@ export function NodePalette({ onAdd, onOpenTest, onOpenInstall }: NodePalettePro
         <button type="button" onClick={onOpenTest}><Circle size={11} /><span><strong>Test the workflow</strong><small>Validate inputs and execution order.</small></span><ArrowRight size={11} /></button>
         <button type="button" onClick={onOpenInstall}><Circle size={11} /><span><strong>Deploy the agent</strong><small>Send it directly to the browser extension.</small></span><ArrowRight size={11} /></button>
       </section>
+      <section className="palette-add-panel">
+        <div><span>Change the workflow</span><p>Choose a step and ForgeOS will place and connect it for you.</p></div>
+        <button className="palette-add-primary" type="button" onClick={onOpenAdd}><Plus size={15} /> Add a step <ChevronDown size={13} /></button>
+        <div className="palette-quick-actions">
+          {QUICK_KINDS.map((kind) => {
+            const item = NODE_REGISTRY[kind]
+            const Icon = item.icon
+            const exists = existingKinds.includes(kind)
+            return <button type="button" onClick={() => exists ? onFocusKind(kind) : onAdd(kind)} key={kind}><span style={{ color: item.color, background: item.softColor }}><Icon size={13} /></span><strong>{item.label}</strong><small>{exists ? 'Edit' : 'Add'}</small></button>
+          })}
+        </div>
+      </section>
       <div className="palette-heading">
-        <span>Add another step</span>
-        <b>{Object.keys(NODE_REGISTRY).length} available</b>
+        <span>Advanced: drag a block</span>
+        <b>{Object.keys(NODE_REGISTRY).length} blocks</b>
       </div>
       <label className="palette-search">
         <Search size={14} />
@@ -81,7 +98,7 @@ export function NodePalette({ onAdd, onOpenTest, onOpenInstall }: NodePalettePro
         ))}
         {groups.length === 0 && <p className="palette-empty">No matching blocks.</p>}
       </div>
-      <p className="palette-tip"><span>How to edit</span> Click a card to change it. Drag from one small dot to another to connect steps.</p>
+      <p className="palette-tip"><span>Easiest option</span> Use Add a step or the quick buttons. Drag blocks only when you want exact placement.</p>
     </aside>
   )
 }

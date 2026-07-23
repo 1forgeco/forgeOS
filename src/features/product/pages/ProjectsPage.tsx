@@ -26,14 +26,14 @@ export function ProjectsPage() {
   return (
     <main className="product-page projects-page">
       <section className="agents-command-hero">
-        <div><span className="product-eyebrow"><Sparkles size={12} /> Your agent command center</span><h1>Build fewer agents.<br />Make each one excellent.</h1><p>Create, test, deploy, and inspect agents that do visible work in your browser. Product Research now performs bounded multi-page comparison instead of stopping at search results.</p><div><Link className="primary-product-action" to="/templates"><Plus size={15} /> Create working agent</Link><a href="/playground"><Workflow size={14} /> Open playground</a></div></div>
+        <div><span className="product-eyebrow"><Sparkles size={12} /> Your agent command center</span><h1>Build a team.<br />Keep every action controlled.</h1><p>Create, test, deploy, and inspect specialist agents for operations, social, sales, SEO, reception, legal documents, and browser research. Each template declares the tools and approvals it needs.</p><div><Link className="primary-product-action" to="/templates"><Plus size={15} /> Create an agent</Link><a href="/playground"><Workflow size={14} /> Open playground</a></div></div>
         <aside><span><i /> Browser runtime ready</span><div><b>01</b><strong>Collect candidates</strong></div><div><b>02</b><strong>Inspect evidence</strong></div><div><b>03</b><strong>Rank by use case</strong></div><small><ShieldCheck size={12} /> Domain restricted · human controlled</small></aside>
       </section>
       <section className="workspace-summary">
         <article><span>Agents</span><strong>{agents.length}</strong><small>{agents.filter((agent) => agent.status === 'live').length} currently live</small></article>
         <article><span>Runs this month</span><strong>0</strong><small>Run history begins after testing</small></article>
         <article><span>Needs approval</span><strong>0</strong><small>Nothing waiting for you</small></article>
-        <article className="runtime-summary"><span><i /> Runtime</span><strong>Research ready</strong><small>Up to five product pages per run</small></article>
+        <article className="runtime-summary"><span><i /> Runtime</span><strong>7 specialist modes</strong><small>Reasoning, browser work, and approval gates</small></article>
       </section>
       <div className="agents-toolbar"><div><h2>Your agents</h2><span>{filtered.length} total</span></div><label><Search size={14} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search agents" /></label></div>
       {loading ? <div className="product-loading">Loading your agents…</div> : filtered.length > 0 ? (

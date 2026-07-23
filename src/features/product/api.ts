@@ -48,6 +48,7 @@ export const productApi = {
   versions: (id: string) => request<{ versions: Array<{ id: string; version: number; createdAt: string }> }>(`/api/agents/${encodeURIComponent(id)}/versions`),
   restoreVersion: (id: string, version: number) => request<{ ok: boolean }>(`/api/agents/${encodeURIComponent(id)}/versions/${version}/restore`, { method: 'POST' }),
   recordRun: (id: string, payload: { status: string; goal: string; result?: string }) => request<{ runId: string }>(`/api/agents/${encodeURIComponent(id)}/runs`, { method: 'POST', body: JSON.stringify(payload) }),
+  executeAgent: (id: string, inputs: Record<string, string>) => request<{ runId: string; result: { responseId: string; model: string; text: string; citations: Array<{ url: string; title: string }> } }>(`/api/agents/${encodeURIComponent(id)}/execute`, { method: 'POST', body: JSON.stringify({ inputs }) }),
   runs: () => request<{ runs: AgentRunRecord[] }>('/api/runs'),
   approvals: () => request<{ approvals: ApprovalRecord[] }>('/api/approvals'),
   resolveApproval: (id: string, status: 'approved' | 'rejected') => request<{ ok: boolean }>(`/api/approvals/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ status }) }),

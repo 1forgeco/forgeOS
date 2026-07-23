@@ -32,6 +32,15 @@ npm run dev
 
 Vite proxies `/api/*` to the Worker, so registration, sign-in, saved agents, and other account-backed features work from the normal `localhost:5173` URL. Local data is stored under `.wrangler/` and is intentionally excluded from Git.
 
+Advanced specialist reasoning runs server-side through the OpenAI Responses API. Add a local `.dev.vars` file before testing Executive Assistant, Social Media, Sales Outreach, SEO, Receptionist, Legal, or model-enhanced extension runs:
+
+```dotenv
+OPENAI_API_KEY=your_server_side_key
+OPENAI_MODEL=gpt-5.6-sol
+```
+
+Never place this key in Vite variables, frontend code, or the extension. Inbox, calendar, social publishing, CMS, and telephony actions separately require provider OAuth/app credentials; the Connections page shows these dependencies instead of reporting an unavailable integration as connected.
+
 Validation:
 
 ```bash
@@ -65,6 +74,8 @@ extension/           Manifest V3 browser execution runtime
 public/              Extension package, media, and social preview
 ```
 
-## Current browser execution scope
+## Agent execution scope
 
-The extension enforces the domain allowlist, opens a normal HTTPS tab, identifies a semantic search field, fills it from run inputs or the goal, and submits the search. Multi-step filtering, sorting, page-state planning, and result verification remain Beta. Login, CAPTCHA, two-factor authentication, payment details, legal acceptance, and protected actions remain user-controlled.
+ForgeOS includes specialist workflows for executive assistance, social media, sales outreach, SEO content, reception, legal documents, product research, and custom browser work. The server-side reasoning runtime produces real results from run inputs and current web evidence where appropriate. The extension enforces the domain allowlist, gathers visible browser evidence, performs permitted page actions, and sends specialist evidence back through the protected reasoning runtime.
+
+External sends, publishing, calendar writes, calls, SMS, and CMS changes require the relevant connection and an approval. Login, CAPTCHA, two-factor authentication, payment details, legal acceptance, signatures, and irreversible actions remain user-controlled.

@@ -20,6 +20,7 @@ import {
   Code2,
   MessageSquareText,
   Play,
+  Plus,
   RotateCcw,
   Save,
   Sparkles,
@@ -29,11 +30,13 @@ import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } fro
 import { useParams } from 'react-router-dom'
 import { productApi } from '../../product/api'
 import { AgentNodeCard } from '../components/AgentNodeCard'
+import { AddStepMenu } from '../components/AddStepMenu'
 import { InspectorPanel } from '../components/InspectorPanel'
 import { InstallAgentPanel } from '../components/InstallAgentPanel'
 import { NodePalette } from '../components/NodePalette'
 import { RunPanel } from '../components/RunPanel'
 import { TestAgentPanel } from '../components/TestAgentPanel'
+import { WorkflowAddContext } from '../components/WorkflowAddContext'
 import { DEFAULT_EDGES, DEFAULT_NODES, createPaletteNode } from '../data/defaultWorkflow'
 import { buildRunDetails, compileBrowserWorkflow, getExecutionOrder } from '../runtime/browserWorkflow'
 import type { AgentEdge, AgentNode, AgentNodeData, AgentNodeKind, RunLog } from '../types'
@@ -89,6 +92,7 @@ function AgentBuilder() {
   const [showRun, setShowRun] = useState(false)
   const [logs, setLogs] = useState<RunLog[]>([])
   const [notice, setNotice] = useState('')
+  const [addMenu, setAddMenu] = useState<{ open: boolean; afterNodeId: string | null }>({ open: false, afterNodeId: null })
   const [saveState, setSaveState] = useState<'loading' | 'saving' | 'saved' | 'error'>(isPlayground ? 'saved' : 'loading')
   const hydrated = useRef(false)
   const activityTimer = useRef<number | null>(null)
@@ -166,12 +170,45 @@ function AgentBuilder() {
     setEdges((current) => addEdge({ ...connection, type: 'smoothstep', animated: true, data: { path: 'primary' } }, current))
   }, [setEdges])
 
-  const addNode = useCallback((kind: AgentNodeKind, position?: { x: number; y: number }) => {
-    const target = position ?? screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
+  const focusKind = useCallback((kind: AgentNodeKind) => {
+    const existing = nodes.find((node) => node.data.kind === kind)
+    if (!existing) return false
+    setSelectedNodeId(existing.id)
+    setNotice(`Editing ${existing.data.label}`)
+    return true
+  }, [nodes])
+
+  const addNode = useCallback((kind: AgentNodeKind, position?: { x: number; y: number }, afterNodeId?: string | null) => {
+    const existing = nodes.find((node) => node.data.kind === kind)
+    if (existing) {
+      setSelectedNodeId(existing.id)
+      setNotice(`${existing.data.label} is already in this workflow`)
+      return
+    }
+    const source = afterNodeId ? nodes.find((node) => node.id === afterNodeId) : null
+    const returnNode = nodes.find((node) => node.data.kind === 'returnResult')
+    const incomingToResult = returnNode ? edges.find((edge) => edge.target === returnNode.id && edge.data?.path !== 'fallback') : null
+    const defaultSource = incomingToResult ? nodes.find((node) => node.id === incomingToResult.source) : null
+    const insertionSource = source || (!position ? defaultSource : null)
+    const target = position ?? (insertionSource ? { x: insertionSource.position.x + 290, y: insertionSource.position.y } : screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 }))
     const node = createPaletteNode(kind, target.x, target.y)
-    setNodes((current) => [...current, node])
+    setNodes((current) => [
+      ...current.map((item) => !position && insertionSource && item.position.x > insertionSource.position.x ? { ...item, position: { ...item.position, x: item.position.x + 290 } } : item),
+      node,
+    ])
+    if (!position && insertionSource) {
+      setEdges((current) => {
+        const outgoing = current.find((edge) => edge.source === insertionSource.id && edge.data?.path !== 'fallback')
+        const withoutOutgoing = outgoing ? current.filter((edge) => edge.id !== outgoing.id) : current
+        const first = { id: `${insertionSource.id}-${node.id}-${Date.now()}`, source: insertionSource.id, target: node.id, type: 'smoothstep', animated: true, data: { path: kind === 'humanTakeover' ? 'fallback' : 'primary' } } as AgentEdge
+        if (!outgoing || kind === 'humanTakeover') return [...current, first]
+        const second = { id: `${node.id}-${outgoing.target}-${Date.now()}`, source: node.id, target: outgoing.target, type: 'smoothstep', animated: true, data: { path: 'primary' } } as AgentEdge
+        return [...withoutOutgoing, first, second]
+      })
+    }
     setSelectedNodeId(node.id)
-  }, [screenToFlowPosition, setNodes])
+    setNotice(`${node.data.label} added and connected`)
+  }, [edges, nodes, screenToFlowPosition, setEdges, setNodes])
 
   const onDrop = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
@@ -277,15 +314,17 @@ function AgentBuilder() {
 
       {view === 'build' && (
         <div className="studio-body">
-          <NodePalette onAdd={addNode} onOpenTest={() => setView('test')} onOpenInstall={() => setView('install')} />
+          <NodePalette onAdd={addNode} onOpenTest={() => setView('test')} onOpenInstall={() => setView('install')} onOpenAdd={() => setAddMenu({ open: true, afterNodeId: null })} onFocusKind={(kind) => void focusKind(kind)} existingKinds={nodes.map((node) => node.data.kind)} />
           <main className="workflow-stage" onDrop={onDrop} onDragOver={(event) => event.preventDefault()}>
             <div className="canvas-context">
+              <button className="canvas-add-step" onClick={() => setAddMenu({ open: true, afterNodeId: null })}><Plus size={12} /> Add step</button>
               <div className="template-pill"><Sparkles size={13} /><span>Custom browser agent</span><b>Core workflow</b></div>
               <button onClick={() => void simulateAgent()}><Play size={12} /> Preview the path</button>
               <button onClick={resetTemplate}><RotateCcw size={12} /> Start over</button>
             </div>
             <div className="canvas-guide"><b>1</b><span>Choose the website</span><i /><b>2</b><span>Describe the outcome</span><i /><b>3</b><span>Set permissions and test</span></div>
             <div className="canvas-health"><span className={healthy ? 'healthy' : ''} /><div><strong>{healthy ? 'Workflow is executable' : compiled.errors[0] ?? 'A step is disconnected'}</strong><small>{nodes.length} steps · {edges.length} connections</small></div></div>
+            <WorkflowAddContext.Provider value={{ requestAddAfter: (nodeId) => setAddMenu({ open: true, afterNodeId: nodeId }) }}>
             <ReactFlow<AgentNode, AgentEdge>
               nodes={nodes}
               edges={visibleEdges}
@@ -308,6 +347,7 @@ function AgentBuilder() {
               <Controls position="bottom-left" showInteractive={false} />
               <MiniMap position="bottom-right" pannable zoomable nodeStrokeWidth={2} maskColor="rgba(244, 246, 251, .78)" />
             </ReactFlow>
+            </WorkflowAddContext.Provider>
             {showRun && <RunPanel logs={logs} running={running} onClose={() => !running && setShowRun(false)} />}
           </main>
           <InspectorPanel node={selectedNode} onChange={updateSelectedNode} onDelete={deleteSelectedNode} onClose={() => setSelectedNodeId(null)} />
@@ -318,6 +358,14 @@ function AgentBuilder() {
       {view === 'install' && (isPlayground ? <section className="playground-deploy-gate"><span><Sparkles size={18} /></span><small>Playground complete</small><h1>Your workflow is ready to become a real agent.</h1><p>The playground stays private to this browser. Create an account when you want to publish immutable versions, connect the extension, synchronize results, and keep run history.</p><div><button onClick={() => setView('test')}><Play size={13} /> Keep testing</button><a href="/login?mode=register&next=/templates">Create a workspace</a></div></section> : <InstallAgentPanel agentId={agentId} title={title} nodes={nodes} edges={edges} onOpenTest={() => setView('test')} />)}
 
       {notice && <div className="studio-notice"><Check size={14} />{notice}</div>}
+      <AddStepMenu
+        open={addMenu.open}
+        afterNodeLabel={nodes.find((node) => node.id === addMenu.afterNodeId)?.data.label}
+        existingKinds={nodes.map((node) => node.data.kind)}
+        onChoose={(kind) => { addNode(kind, undefined, addMenu.afterNodeId); setAddMenu({ open: false, afterNodeId: null }) }}
+        onFocusExisting={(kind) => { focusKind(kind); setAddMenu({ open: false, afterNodeId: null }) }}
+        onClose={() => setAddMenu({ open: false, afterNodeId: null })}
+      />
       <div className="studio-ambient studio-ambient-one" />
       <div className="studio-ambient studio-ambient-two" />
     </div>

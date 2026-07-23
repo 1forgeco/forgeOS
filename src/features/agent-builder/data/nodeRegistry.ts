@@ -13,8 +13,10 @@ import type { AgentNodeKind, NodeCategory, NodeConfig } from '../types'
 export type ConfigField = {
   key: string
   label: string
-  type: 'text' | 'textarea'
+  type: 'text' | 'textarea' | 'select' | 'multiselect' | 'taglist'
   hint?: string
+  placeholder?: string
+  options?: Array<{ label: string; value: string }>
 }
 
 export type NodeDefinition = {
@@ -52,7 +54,7 @@ export const NODE_REGISTRY: Record<AgentNodeKind, NodeDefinition> = {
     config: { websiteUrl: 'https://www.amazon.in', allowedDomains: 'amazon.in' },
     fields: [
       { key: 'websiteUrl', label: 'Which page should the agent open?', type: 'text', hint: 'Enter a complete address, including https://.' },
-      { key: 'allowedDomains', label: 'Which websites may it use?', type: 'text', hint: 'Separate domains with commas. The agent is blocked everywhere else.' },
+      { key: 'allowedDomains', label: 'Which websites may it use?', type: 'taglist', placeholder: 'amazon.in', hint: 'Add one approved domain at a time. The agent is blocked everywhere else.' },
     ],
   },
   taskGoal: {
@@ -81,7 +83,7 @@ export const NODE_REGISTRY: Record<AgentNodeKind, NodeDefinition> = {
     color: '#0b9f78',
     softColor: '#e5f8f2',
     config: { fields: 'search item, maximum budget, preferred colour' },
-    fields: [{ key: 'fields', label: 'What should the user enter before each run?', type: 'textarea', hint: 'Separate fields with commas. Remove this node if the task never needs changing inputs.' }],
+    fields: [{ key: 'fields', label: 'What should the user enter before each run?', type: 'taglist', placeholder: 'maximum budget', hint: 'Add each requested input as a separate field. Remove this node if the task never needs changing inputs.' }],
   },
   browserAgent: {
     kind: 'browserAgent',
@@ -98,9 +100,18 @@ export const NODE_REGISTRY: Record<AgentNodeKind, NodeDefinition> = {
       instructions: 'Use visible page information. Verify every page change. Never guess when a control is unclear.',
     },
     fields: [
-      { key: 'runtimeMode', label: 'Runtime mode', type: 'text', hint: 'Use “product-research” for multi-page shopping research or “general” for normal browser tasks.' },
-      { key: 'allowedActions', label: 'Which browser actions may it use?', type: 'textarea', hint: 'These are capabilities, not fixed steps. Remove any action the agent should never take.' },
-      { key: 'maximumSteps', label: 'Maximum actions in one run', type: 'text', hint: 'A limit prevents the agent from continuing indefinitely.' },
+      { key: 'runtimeMode', label: 'What kind of agent is this?', type: 'select', options: [
+        { label: 'General browser agent', value: 'general' },
+        { label: 'Product research agent', value: 'product-research' },
+        { label: 'Executive assistant', value: 'executive-assistant' },
+        { label: 'Social media manager', value: 'social-media' },
+        { label: 'Sales outreach agent', value: 'sales-outreach' },
+        { label: 'SEO writer', value: 'seo-writer' },
+        { label: 'Receptionist', value: 'receptionist' },
+        { label: 'Legal assistant', value: 'legal-assistant' },
+      ], hint: 'The selected mode changes the agent’s reasoning instructions and completion checks.' },
+      { key: 'allowedActions', label: 'What may the agent do?', type: 'multiselect', options: ['open pages', 'search', 'click', 'type', 'select', 'filter', 'sort', 'scroll', 'extract text'].map((value) => ({ label: value.replace(/\b\w/g, (letter) => letter.toUpperCase()), value })), hint: 'Click a capability to allow or block it. The agent cannot use an unselected action.' },
+      { key: 'maximumSteps', label: 'Maximum actions in one run', type: 'select', options: [10, 25, 45, 75].map((value) => ({ label: `${value} actions`, value: String(value) })), hint: 'A limit prevents the agent from continuing indefinitely.' },
       { key: 'instructions', label: 'Extra rules for the agent', type: 'textarea', hint: 'Add website-specific guidance or things the agent must avoid.' },
     ],
   },
@@ -113,7 +124,7 @@ export const NODE_REGISTRY: Record<AgentNodeKind, NodeDefinition> = {
     color: '#d04f81',
     softColor: '#ffedf4',
     config: { approvalActions: 'payment, purchase, submit form, send message, publish, delete, accept terms' },
-    fields: [{ key: 'approvalActions', label: 'Which actions always need your approval?', type: 'textarea', hint: 'Separate actions with commas. Login, CAPTCHA, payment and two-factor checks always require takeover.' }],
+    fields: [{ key: 'approvalActions', label: 'Which actions always need your approval?', type: 'multiselect', options: ['payment', 'purchase', 'submit form', 'send message', 'publish', 'delete', 'accept terms', 'create appointment', 'reschedule appointment', 'transfer call', 'sign'].map((value) => ({ label: value.replace(/\b\w/g, (letter) => letter.toUpperCase()), value })), hint: 'Click to require approval. Login, CAPTCHA, payment details and two-factor checks always require takeover.' }],
   },
   returnResult: {
     kind: 'returnResult',

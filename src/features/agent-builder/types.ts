@@ -45,7 +45,7 @@ export type BrowserWorkflowDefinition = {
   allowedDomains: string[]
   goal: string
   completionCriteria: string
-  runtimeMode: 'general' | 'product-research'
+  runtimeMode: 'general' | 'product-research' | 'executive-assistant' | 'social-media' | 'sales-outreach' | 'seo-writer' | 'receptionist' | 'legal-assistant'
   agentInstructions: string
   inputs: string[]
   allowedActions: string[]

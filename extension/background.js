@@ -197,6 +197,17 @@ async function updateRemoteRun(runId, status, result = '') {
   try { await apiRequest(`/api/extension/runs/${encodeURIComponent(runId)}`, { method: 'PATCH', body: JSON.stringify({ status, result }) }) } catch { /* the local run remains usable offline */ }
 }
 
+async function enhanceSpecialistResult(runId, agent, inputs, pageEvidence) {
+  emitRunEvent(runId, 'running', 'Specialist reasoning', 'Turning the visible browser evidence into the requested specialist output.')
+  const response = await apiRequest('/api/extension/reason', {
+    method: 'POST',
+    body: JSON.stringify({ agentId: agent.agentId, inputs, pageEvidence }),
+  })
+  const result = response?.result
+  if (!result?.text) throw new Error('The specialist reasoning step returned no usable output.')
+  return result.text
+}
+
 async function syncEvent(runId, state, title, detail) {
   try { await apiRequest(`/api/extension/runs/${encodeURIComponent(runId)}/events`, { method: 'POST', body: JSON.stringify({ state, title, detail }) }) } catch { /* transient activity may remain local */ }
 }
@@ -427,6 +438,9 @@ async function runInstalledAgent(agentId, inputs, options = {}) {
         continue
       }
       finalResult = response.result || response.detail || ''
+      if (!['general', 'product-research'].includes(workflow.runtimeMode || 'general')) {
+        finalResult = await enhanceSpecialistResult(runId, agent, inputs, finalResult)
+      }
       emitRunEvent(runId, 'completed', response.title || 'Agent completed', response.detail || 'The workflow finished successfully.', { result: finalResult })
       await updateRemoteRun(runId, 'completed', finalResult)
       const nextAgents = agents.map((item) => item.agentId === agentId ? { ...item, lastRunAt: new Date().toISOString() } : item)

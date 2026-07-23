@@ -1,10 +1,12 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { Check, LoaderCircle } from 'lucide-react'
+import { Check, LoaderCircle, Plus } from 'lucide-react'
 import type { CSSProperties } from 'react'
 import { NODE_REGISTRY } from '../data/nodeRegistry'
 import type { AgentNode } from '../types'
+import { useWorkflowAdd } from './WorkflowAddContext'
 
-export function AgentNodeCard({ data, selected }: NodeProps<AgentNode>) {
+export function AgentNodeCard({ id, data, selected }: NodeProps<AgentNode>) {
+  const { requestAddAfter } = useWorkflowAdd()
   const definition = NODE_REGISTRY[data.kind]
   const Icon = definition.icon
   const isTrigger = data.kind === 'manualTrigger'
@@ -29,6 +31,7 @@ export function AgentNodeCard({ data, selected }: NodeProps<AgentNode>) {
         <span>{data.status === 'idle' ? 'Ready' : data.status === 'running' ? 'Working…' : data.status === 'success' ? 'Complete' : data.status}</span>
         <i />
       </div>
+      {!isTerminal && <button className="node-quick-add nodrag nopan" type="button" title={`Add a step after ${data.label}`} aria-label={`Add a step after ${data.label}`} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); requestAddAfter(id) }}><Plus size={13} /></button>}
       {!isTerminal && <Handle className="agent-handle agent-handle-source" type="source" position={Position.Right} />}
     </article>
   )

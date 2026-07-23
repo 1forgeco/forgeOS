@@ -19,6 +19,9 @@ export type AgentTemplate = {
   defaultUrl: string
   defaultGoal: string
   defaultInputs: string
+  runtimeMode: string
+  requiredConnections: string[]
+  approvalDefaults: string
 }
 
 export type StoredAgent = {

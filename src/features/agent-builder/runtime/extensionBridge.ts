@@ -44,7 +44,13 @@ function bridgeRequest<T>(type: string, payload?: unknown, timeout = 1_500) {
 }
 
 export async function detectForgeOSExtension() {
-  const response = await bridgeRequest<ForgeOSExtensionStatus>('FORGEOS_EXTENSION_PING')
+  if (!document.documentElement.dataset.forgeosExtension) {
+    await new Promise<void>((resolve) => {
+      const timer = window.setTimeout(resolve, 650)
+      window.addEventListener('forgeos-extension-ready', () => { window.clearTimeout(timer); resolve() }, { once: true })
+    })
+  }
+  const response = await bridgeRequest<ForgeOSExtensionStatus>('FORGEOS_EXTENSION_PING', undefined, 3_000)
   return response.ok && response.payload ? response.payload : null
 }
 

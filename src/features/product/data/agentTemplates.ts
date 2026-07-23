@@ -5,17 +5,17 @@ import type { AgentTemplate } from '../types'
 export const AGENT_TEMPLATES: AgentTemplate[] = [
   {
     id: 'product-research', slug: 'product-research', name: 'Product Research Agent', shortName: 'Product research',
-    description: 'Searches approved stores, applies requirements, and returns comparable options.',
-    outcome: 'Find the right product without opening twenty tabs.', category: 'Research', availability: 'available',
+    description: 'Researches search results and product pages, checks specifications, age, price, ratings and review evidence, then ranks the strongest choices for different use cases.',
+    outcome: 'Get an evidence-backed shortlist instead of a search page.', category: 'Research', availability: 'available',
     accent: '#6958df', softAccent: '#eeebff', exampleSites: ['Amazon', 'Flipkart', 'Retail sites'],
-    capabilities: ['Search', 'Compare', 'Extract'], risk: 'Low', defaultUrl: 'https://www.amazon.in',
-    defaultGoal: 'Find a black mechanical keyboard under ₹5,000 with at least four stars and return the three best options.',
-    defaultInputs: 'search item, maximum budget, preferred colour',
+    capabilities: ['Multi-page research', 'Evidence scoring', 'Use-case ranking'], risk: 'Low', defaultUrl: 'https://www.amazon.in',
+    defaultGoal: 'Research the strongest matching products, inspect the leading product pages, compare price, rating, review confidence, specifications, availability and launch recency, then recommend the best overall, best value and best use-case choices with evidence and direct links.',
+    defaultInputs: 'product, maximum budget, must-have features, intended use, launch-date preference',
   },
   {
     id: 'booking-assistant', slug: 'booking-assistant', name: 'Booking Assistant', shortName: 'Booking',
     description: 'Finds suitable services or appointments and pauses before confirming anything.',
-    outcome: 'Turn a request into a ready-to-confirm booking.', category: 'Planning', availability: 'beta',
+    outcome: 'Turn a request into a ready-to-confirm booking.', category: 'Planning', availability: 'coming-soon',
     accent: '#248d70', softAccent: '#e5f7f0', exampleSites: ['Calendly', 'Service sites', 'Clinics'],
     capabilities: ['Search', 'Availability', 'Approval'], risk: 'Moderate', defaultUrl: 'https://www.google.com',
     defaultGoal: 'Find suitable appointment options matching my requirements and ask before confirming a time.',
@@ -24,7 +24,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
   {
     id: 'travel-planner', slug: 'travel-planner', name: 'Travel Planning Agent', shortName: 'Travel planner',
     description: 'Researches destinations, stays, transport, and activities within a budget.',
-    outcome: 'Create a practical shortlist for an upcoming trip.', category: 'Planning', availability: 'beta',
+    outcome: 'Create a practical shortlist for an upcoming trip.', category: 'Planning', availability: 'coming-soon',
     accent: '#197fc4', softAccent: '#e5f4fc', exampleSites: ['Booking.com', 'Maps', 'Travel sites'],
     capabilities: ['Research', 'Filter', 'Summarize'], risk: 'Low', defaultUrl: 'https://www.booking.com',
     defaultGoal: 'Find well-rated accommodation matching my dates, destination, and budget. Return the best three options.',
@@ -33,7 +33,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
   {
     id: 'form-assistant', slug: 'form-assistant', name: 'Form Assistant', shortName: 'Form assistant',
     description: 'Prepares repetitive forms and pauses before every final submission.',
-    outcome: 'Complete routine forms with fewer mistakes.', category: 'Productivity', availability: 'beta',
+    outcome: 'Complete routine forms with fewer mistakes.', category: 'Productivity', availability: 'coming-soon',
     accent: '#d06b3f', softAccent: '#fff0e8', exampleSites: ['Portals', 'Applications', 'Admin tools'],
     capabilities: ['Read', 'Type', 'Review'], risk: 'Protected', defaultUrl: 'https://example.com',
     defaultGoal: 'Fill the form using the information provided, highlight missing fields, and ask before submitting.',
@@ -42,7 +42,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
   {
     id: 'website-research', slug: 'website-research', name: 'Website Research Agent', shortName: 'Website research',
     description: 'Visits approved sources and turns page information into a structured brief.',
-    outcome: 'Get useful answers with the source pages attached.', category: 'Research', availability: 'beta',
+    outcome: 'Get useful answers with the source pages attached.', category: 'Research', availability: 'coming-soon',
     accent: '#7650a7', softAccent: '#f2eafb', exampleSites: ['Documentation', 'Directories', 'Public sites'],
     capabilities: ['Navigate', 'Extract', 'Summarize'], risk: 'Low', defaultUrl: 'https://en.wikipedia.org',
     defaultGoal: 'Research the requested topic on this website and return a concise structured summary with source links.',
@@ -82,5 +82,11 @@ export function createWorkflowFromTemplate(template: AgentTemplate, overrides?: 
   try { update('targetWebsite', 'allowedDomains', new URL(overrides?.url || template.defaultUrl).hostname.replace(/^www\./, '')) } catch { /* validation happens in the builder */ }
   update('taskGoal', 'goal', overrides?.goal || template.defaultGoal)
   update('requiredInputs', 'fields', overrides?.inputs || template.defaultInputs)
+  if (template.id === 'product-research') {
+    update('taskGoal', 'completionCriteria', 'Inspect up to five leading product pages and return evidence-backed recommendations for best overall, best value, and best fit. Include price, rating, review count, important features, availability, launch/date evidence when present, trade-offs, and direct links.')
+    update('browserAgent', 'runtimeMode', 'product-research')
+    update('browserAgent', 'maximumSteps', '45')
+    update('browserAgent', 'instructions', 'Research several candidates instead of stopping at search. Prefer verified product details over card text, penalize weak review evidence, respect the budget, and explain why each recommendation fits a different use case.')
+  }
   return { nodes, edges: DEFAULT_EDGES.map((edge) => ({ ...edge })) as AgentEdge[] }
 }

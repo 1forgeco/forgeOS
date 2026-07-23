@@ -11,7 +11,7 @@ type AgentTemplateCardProps = {
 export function AgentTemplateCard({ template, compact = false }: AgentTemplateCardProps) {
   const available = template.availability !== 'coming-soon'
   return (
-    <article className={`agent-template-card${compact ? ' compact' : ''}`} style={{ '--template-accent': template.accent, '--template-soft': template.softAccent } as CSSProperties}>
+    <article className={`agent-template-card${compact ? ' compact' : ''}${available ? '' : ' unavailable'}`} title={available ? undefined : 'Coming soon — this agent cannot be opened yet'} aria-disabled={!available} style={{ '--template-accent': template.accent, '--template-soft': template.softAccent } as CSSProperties}>
       <div className="template-card-top">
         <span className="template-avatar"><Bot size={compact ? 16 : 20} /></span>
         <span className={`availability-badge ${template.availability}`}>{template.availability === 'available' ? <Check size={10} /> : <Clock3 size={10} />}{template.availability.replace('-', ' ')}</span>
@@ -22,8 +22,7 @@ export function AgentTemplateCard({ template, compact = false }: AgentTemplateCa
       {!compact && <div className="template-capabilities">{template.capabilities.map((item) => <span key={item}>{item}</span>)}</div>}
       <div className="template-card-meta"><span><ShieldCheck size={11} /> {template.risk} risk</span><span>{template.exampleSites[0]}</span></div>
       <div className="template-card-actions">
-        <Link to={`/agents/${template.slug}`}>See details</Link>
-        {available ? <Link className="use-template" to={`/new/${template.id}`}>Use agent <ArrowUpRight size={13} /></Link> : <span className="coming-label">In roadmap</span>}
+        {available ? <><Link to={`/agents/${template.slug}`}>See details</Link><Link className="use-template" to={`/new/${template.id}`}>Use agent <ArrowUpRight size={13} /></Link></> : <><span className="coming-label">Workflow in development</span><span className="coming-hover">Coming soon</span></>}
       </div>
     </article>
   )

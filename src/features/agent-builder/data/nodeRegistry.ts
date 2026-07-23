@@ -92,11 +92,13 @@ export const NODE_REGISTRY: Record<AgentNodeKind, NodeDefinition> = {
     color: '#e8912f',
     softColor: '#fff3e5',
     config: {
+      runtimeMode: 'general',
       allowedActions: 'open pages, search, click, type, select, filter, sort, scroll, extract text',
       maximumSteps: 25,
       instructions: 'Use visible page information. Verify every page change. Never guess when a control is unclear.',
     },
     fields: [
+      { key: 'runtimeMode', label: 'Runtime mode', type: 'text', hint: 'Use “product-research” for multi-page shopping research or “general” for normal browser tasks.' },
       { key: 'allowedActions', label: 'Which browser actions may it use?', type: 'textarea', hint: 'These are capabilities, not fixed steps. Remove any action the agent should never take.' },
       { key: 'maximumSteps', label: 'Maximum actions in one run', type: 'text', hint: 'A limit prevents the agent from continuing indefinitely.' },
       { key: 'instructions', label: 'Extra rules for the agent', type: 'textarea', hint: 'Add website-specific guidance or things the agent must avoid.' },

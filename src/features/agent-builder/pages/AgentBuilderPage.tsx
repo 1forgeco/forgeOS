@@ -77,6 +77,7 @@ export function AgentBuilderPage() {
 
 function AgentBuilder() {
   const { agentId = '' } = useParams()
+  const isPlayground = !agentId
   const initial = useMemo(loadWorkflow, [])
   const [nodes, setNodes, onNodesChange] = useNodesState<AgentNode>(initial.nodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState<AgentEdge>(initial.edges)
@@ -88,7 +89,7 @@ function AgentBuilder() {
   const [showRun, setShowRun] = useState(false)
   const [logs, setLogs] = useState<RunLog[]>([])
   const [notice, setNotice] = useState('')
-  const [saveState, setSaveState] = useState<'loading' | 'saving' | 'saved' | 'error'>('loading')
+  const [saveState, setSaveState] = useState<'loading' | 'saving' | 'saved' | 'error'>(isPlayground ? 'saved' : 'loading')
   const hydrated = useRef(false)
   const activityTimer = useRef<number | null>(null)
   const { screenToFlowPosition, fitView } = useReactFlow<AgentNode, AgentEdge>()
@@ -108,7 +109,12 @@ function AgentBuilder() {
     let cancelled = false
     productApi.agent(agentId).then(({ agent }) => {
       if (cancelled) return
-      setTitle(agent.name); setNodes(agent.nodes); setEdges(agent.edges); setReady(agent.status === 'live' || agent.status === 'testing'); hydrated.current = true; setSaveState('saved')
+      const upgradedNodes = agent.templateId === 'product-research' ? agent.nodes.map((node) => {
+        if (node.data.kind === 'browserAgent') return { ...node, data: { ...node.data, config: { ...node.data.config, runtimeMode: 'product-research', maximumSteps: 45, instructions: 'Research several candidates instead of stopping at search. Prefer verified product details over card text, penalize weak review evidence, respect the budget, and explain why each recommendation fits a different use case.' } } }
+        if (node.data.kind === 'taskGoal') return { ...node, data: { ...node.data, config: { ...node.data.config, completionCriteria: 'Inspect up to five leading product pages and return evidence-backed recommendations for best overall, best value, and best fit. Include price, rating, review count, important features, availability, launch/date evidence when present, trade-offs, and direct links.' } } }
+        return node
+      }) : agent.nodes
+      setTitle(agent.name); setNodes(upgradedNodes); setEdges(agent.edges); setReady(agent.status === 'live' || agent.status === 'testing'); hydrated.current = true; setSaveState('saved')
       window.setTimeout(() => void fitView({ padding: 0.16, duration: 450 }), 80)
     }).catch(() => { if (!cancelled) { hydrated.current = true; setSaveState('error'); setNotice('This agent could not be loaded') } })
     return () => { cancelled = true }
@@ -131,6 +137,20 @@ function AgentBuilder() {
     }, 700)
     return () => window.clearTimeout(timer)
   }, [agentId, title, ready, nodes, edges])
+
+  useEffect(() => {
+    if (!isPlayground) return
+    setSaveState('saving')
+    const timer = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ title, ready, nodes, edges }))
+        setSaveState('saved')
+      } catch {
+        setSaveState('error')
+      }
+    }, 350)
+    return () => window.clearTimeout(timer)
+  }, [isPlayground, title, ready, nodes, edges])
 
   useEffect(() => {
     if (!notice) return
@@ -233,8 +253,8 @@ function AgentBuilder() {
     <div className="studio-page">
       <header className="studio-header">
         <div className="studio-branding">
-          <a href="/projects" className="studio-back" aria-label="Back to agents"><ArrowLeft size={16} /></a>
-          <a href="/projects" className="studio-logo"><span>F</span><div><strong>ForgeOS</strong><small>Agent studio</small></div></a>
+          <a href={isPlayground ? '/' : '/projects'} className="studio-back" aria-label={isPlayground ? 'Back to ForgeOS home' : 'Back to agents'}><ArrowLeft size={16} /></a>
+          <a href={isPlayground ? '/' : '/projects'} className="studio-logo"><span>F</span><div><strong>ForgeOS</strong><small>{isPlayground ? 'Public playground' : 'Agent studio'}</small></div></a>
           <i />
           <div className="workflow-name">
             <input aria-label="Agent name" value={title} onChange={(event) => setTitle(event.target.value)} />
@@ -249,7 +269,7 @@ function AgentBuilder() {
         </nav>
 
         <div className="studio-actions">
-          <div className={`save-state ${saveState}`}><Cloud size={13} /><span>{saveState === 'saving' ? 'Saving…' : saveState === 'error' ? 'Save failed' : saveState === 'loading' ? 'Loading…' : 'Saved to workspace'}</span></div>
+          <div className={`save-state ${saveState}`}><Cloud size={13} /><span>{saveState === 'saving' ? 'Saving…' : saveState === 'error' ? 'Save failed' : saveState === 'loading' ? 'Loading…' : isPlayground ? 'Saved on this device' : 'Saved to workspace'}</span></div>
           {view === 'build' && <button className="secondary-action" onClick={simulateAgent} disabled={running || !healthy}><Play size={14} fill="currentColor" /> {running ? 'Running…' : 'Dry run'}</button>}
           <button className={`publish-action${ready ? ' published' : ''}`} onClick={ready ? () => setView('install') : markReady}>{ready ? <Check size={14} /> : <Save size={14} />} {ready ? 'Ready to deploy' : 'Validate agent'}</button>
         </div>
@@ -295,7 +315,7 @@ function AgentBuilder() {
       )}
 
       {view === 'test' && <TestAgentPanel agentId={agentId} title={title} nodes={nodes} edges={edges} onActivity={showConversationActivity} />}
-      {view === 'install' && <InstallAgentPanel agentId={agentId} title={title} nodes={nodes} edges={edges} onOpenTest={() => setView('test')} />}
+      {view === 'install' && (isPlayground ? <section className="playground-deploy-gate"><span><Sparkles size={18} /></span><small>Playground complete</small><h1>Your workflow is ready to become a real agent.</h1><p>The playground stays private to this browser. Create an account when you want to publish immutable versions, connect the extension, synchronize results, and keep run history.</p><div><button onClick={() => setView('test')}><Play size={13} /> Keep testing</button><a href="/login?mode=register&next=/templates">Create a workspace</a></div></section> : <InstallAgentPanel agentId={agentId} title={title} nodes={nodes} edges={edges} onOpenTest={() => setView('test')} />)}
 
       {notice && <div className="studio-notice"><Check size={14} />{notice}</div>}
       <div className="studio-ambient studio-ambient-one" />

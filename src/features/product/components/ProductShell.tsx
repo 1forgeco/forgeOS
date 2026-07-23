@@ -27,7 +27,7 @@ export function ProductShell() {
           {links.map(([label, path, Icon]) => <NavLink to={path} className={({ isActive }) => isActive ? 'active' : ''} key={path}><Icon size={15} /><span>{label}</span></NavLink>)}
         </nav>
         <div className="sidebar-spacer" />
-        <div className="product-beta-note"><Sparkles size={14} /><div><strong>Browser runtime beta</strong><p>Search works now. Multi-step page planning is expanding.</p></div></div>
+        <div className="product-beta-note"><Sparkles size={14} /><div><strong>Research runtime v0.4</strong><p>Multi-page product comparison is ready. More agent types are coming next.</p></div></div>
         <NavLink className={({ isActive }) => `settings-link${isActive ? ' active' : ''}`} to="/settings"><Settings size={15} /> Settings</NavLink>
         <div className="account-switcher">
           <span>{session?.user?.name?.slice(0, 1).toUpperCase() || 'F'}</span>
@@ -38,7 +38,7 @@ export function ProductShell() {
       <div className="product-main-column">
         <header className="product-topbar">
           <div><span className="live-dot" /> Protected workspace</div>
-          <nav><a href="https://studio.1forge.in/" target="_blank" rel="noreferrer">1forge Studio</a><a href="/">ForgeOS home</a><button onClick={() => void signOut()}><LogOut size={13} /> Sign out</button></nav>
+          <nav><a href="/playground">Playground</a><a href="/">ForgeOS home</a><button onClick={() => void signOut()}><LogOut size={13} /> Sign out</button></nav>
         </header>
         <Outlet context={{ session }} />
       </div>

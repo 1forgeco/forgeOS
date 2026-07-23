@@ -100,8 +100,8 @@ export function MarketingPage() {
             </h1>
             <p className="hero-intro">Choose a starting point, describe the website and outcome, then shape a visual workflow that can be tested, approved, and deployed.</p>
             <div className="hero-actions">
-              <a className="button button-dark" href="/login?mode=register&next=/templates">Build your agent <ArrowUpRight /></a>
-              <a className="button button-soft" href="#agents">Explore templates <span>↓</span></a>
+              <a className="button button-dark" href="/playground">Open the playground <ArrowUpRight /></a>
+              <a className="button button-soft" href="#agents">Explore agents <span>↓</span></a>
             </div>
             <div className="cinematic-hero-proof"><span><i /> Visual workflows</span><span><i /> Human approvals</span><span><i /> Domain locked</span></div>
           </div>
@@ -140,6 +140,10 @@ export function MarketingPage() {
 
       <section className="showcase section-shell" aria-label="Agent workflow showcase">
         <PlatformShowcase />
+        <div className="playground-invite">
+          <div><span>Public playground</span><h3>Move the nodes. Rewrite the goal. Test the logic.</h3><p>Explore the complete visual builder without choosing a template or creating an account. Your draft stays in this browser.</p></div>
+          <a className="button button-dark" href="/playground">Experiment now <ArrowUpRight /></a>
+        </div>
       </section>
 
       <section className="systems section-shell" id="platform">

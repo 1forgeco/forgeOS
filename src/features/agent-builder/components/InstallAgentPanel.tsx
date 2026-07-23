@@ -32,7 +32,7 @@ export function InstallAgentPanel({ agentId, title, nodes, edges, onOpenTest }: 
     const status = await detectForgeOSExtension()
     setExtension(status)
     setCheckingExtension(false)
-    setDeliveryMessage(status ? `${status.paired ? 'Connected' : 'Detected'} · extension ${status.extensionVersion} · ${status.agentCount} installed agent${status.agentCount === 1 ? '' : 's'}` : 'Extension not detected. Install or reload it, then check again.')
+    setDeliveryMessage(status ? `${status.paired ? 'Connected' : 'Detected'} · extension ${status.extensionVersion} · ${status.agentCount} installed agent${status.agentCount === 1 ? '' : 's'}` : 'Extension not detected. Reload it in chrome://extensions, then refresh this ForgeOS tab once.')
     return status
   }, [])
 
@@ -61,7 +61,7 @@ export function InstallAgentPanel({ agentId, title, nodes, edges, onOpenTest }: 
     setDeliveryMessage('Connecting this browser securely…')
     try {
       const detected = extension ?? await checkExtension()
-      if (!detected) throw new Error('Install or reload the ForgeOS extension before deploying.')
+      if (!detected) throw new Error('Reload the ForgeOS extension, refresh this ForgeOS tab, and check again before deploying.')
       const pairing = await productApi.pairExtension({
         installationId: detected.installationId,
         extensionVersion: detected.extensionVersion,
@@ -110,7 +110,7 @@ export function InstallAgentPanel({ agentId, title, nodes, edges, onOpenTest }: 
       <section className="install-hero">
         <span className="view-eyebrow"><Puzzle size={13} /> Browser deployment</span>
         <h1>Deploy directly to your browser.</h1>
-        <p>ForgeOS detects the extension, publishes an immutable version, transfers it through a short-lived secure handoff, and keeps run activity synchronized—without downloading or importing JSON.</p>
+        <p>ForgeOS detects the extension on this exact app origin—localhost or hosted—publishes an immutable version, transfers it through a short-lived secure handoff, and keeps run activity synchronized. It does not depend on ChatGPT or a separate AI website.</p>
       </section>
 
       <div className={`extension-connection-card ${extension ? 'connected' : 'disconnected'}`}>
@@ -145,7 +145,7 @@ export function InstallAgentPanel({ agentId, title, nodes, edges, onOpenTest }: 
 
         <section className="extension-capability-card">
           <header><span><Puzzle size={16} /></span><div><strong>Extension runtime</strong><p>{extension ? `Version ${extension.extensionVersion}` : 'Waiting for connection'}</p></div></header>
-          <div><span><Check size={12} /> Multiple installed agents</span><span><Check size={12} /> Pause, stop and takeover</span><span><Check size={12} /> Search, click, select and extract</span><span><Check size={12} /> Run history synchronization</span></div>
+          <div><span><Check size={12} /> Localhost and hosted detection</span><span><Check size={12} /> Pause, stop and takeover</span><span><Check size={12} /> Multi-page product research</span><span><Check size={12} /> Evidence-backed result brief</span></div>
           {!extension && <a href="/forgeos-extension.zip" download><Download size={13} /> Install development extension</a>}
         </section>
       </div>

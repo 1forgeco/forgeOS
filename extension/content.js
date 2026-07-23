@@ -3,12 +3,14 @@ const EXTENSION_CHANNEL = 'forgeos-extension'
 
 function isForgeOSPage() {
   const host = window.location.hostname
-  return document.querySelector('meta[name="forgeos-app"][content="agent-studio"]')
-    || host === 'forgeos-agent-studio.kamalkatal512.chatgpt.site'
-    || ['localhost', '127.0.0.1'].includes(host)
+  const trustedHost = ['localhost', '127.0.0.1', 'forgeos.1forge.in', 'forgeos-agent-studio.kamalkatal512.chatgpt.site'].includes(host)
+  return trustedHost && Boolean(document.querySelector('meta[name="forgeos-app"][content="agent-studio"]'))
 }
 
 if (isForgeOSPage()) {
+  document.documentElement.dataset.forgeosExtension = chrome.runtime.getManifest().version
+  window.postMessage({ channel: EXTENSION_CHANNEL, type: 'FORGEOS_EXTENSION_READY', version: chrome.runtime.getManifest().version }, window.location.origin)
+  window.dispatchEvent(new CustomEvent('forgeos-extension-ready', { detail: { version: chrome.runtime.getManifest().version } }))
   window.addEventListener('message', async (event) => {
     if (event.source !== window || event.origin !== window.location.origin) return
     const message = event.data
@@ -16,7 +18,7 @@ if (isForgeOSPage()) {
     const respond = (ok, payload, error) => window.postMessage({ channel: EXTENSION_CHANNEL, requestId: message.requestId, ok, payload, error }, window.location.origin)
     try {
       if (message.type === 'FORGEOS_EXTENSION_PING') {
-        const response = await chrome.runtime.sendMessage({ type: 'FORGEOS_EXTENSION_INFO' })
+        const response = await chrome.runtime.sendMessage({ type: 'FORGEOS_EXTENSION_INFO', pageOrigin: window.location.origin })
         respond(Boolean(response?.ok), response?.info, response?.error)
       } else if (message.type === 'FORGEOS_EXTENSION_DEPLOY') {
         const response = await chrome.runtime.sendMessage({ type: 'FORGEOS_DEPLOY_FROM_WEB', payload: message.payload })
@@ -148,6 +150,75 @@ function resultElements() {
     .filter(visible)
 }
 
+function cleanText(value, limit = 500) {
+  return String(value || '').replace(/\s+/g, ' ').trim().slice(0, limit)
+}
+
+function firstText(root, selectors, limit) {
+  for (const selector of selectors) {
+    const value = cleanText(root.querySelector(selector)?.textContent, limit)
+    if (value) return value
+  }
+  return ''
+}
+
+function absoluteUrl(value) {
+  try { return new URL(value, window.location.href).href } catch { return '' }
+}
+
+function extractSearchCandidates() {
+  const seen = new Set()
+  return resultElements().map((card, index) => {
+    const title = firstText(card, ['h2 span', 'h2', '[data-testid*="title"]', '[class*="title"]'], 220)
+    const linkElement = card.querySelector('h2 a[href], a[href*="/dp/"], a[href*="/product/"], a[href]')
+    const url = absoluteUrl(linkElement?.getAttribute('href'))
+    const price = firstText(card, ['.a-price .a-offscreen', '[data-testid*="price"]', '[class*="price"]'], 80)
+    const rating = firstText(card, ['.a-icon-alt', '[aria-label*="out of"]', '[data-testid*="rating"]', '[class*="rating"]'], 80)
+    const reviews = firstText(card, ['a[href*="customerReviews"] span', '[data-testid*="review"]', '[class*="review-count"]'], 60)
+    const sponsored = /sponsored|promoted/i.test(cleanText(card.textContent, 180))
+    const key = url || title
+    if (!title || !url || seen.has(key)) return null
+    seen.add(key)
+    return { rank: index + 1, title, url, price, rating, reviews, sponsored, cardEvidence: cleanText(card.textContent, 420) }
+  }).filter(Boolean).slice(0, 10)
+}
+
+function extractProductDetail() {
+  const main = document.querySelector('main, #dp, #ppd, [role="main"]') || document.body
+  const title = firstText(document, ['#productTitle', 'h1', '[data-testid*="title"]'], 260) || cleanText(document.title, 260)
+  const price = firstText(document, ['#corePrice_feature_div .a-offscreen', '.a-price .a-offscreen', '[data-testid*="price"]', '[class*="price"]'], 90)
+  const rating = firstText(document, ['#acrPopover', '.a-icon-alt', '[aria-label*="out of"]', '[data-testid*="rating"]'], 90)
+  const reviews = firstText(document, ['#acrCustomerReviewText', '[data-hook="total-review-count"]', '[data-testid*="review"]'], 80)
+  const availability = firstText(document, ['#availability', '[data-testid*="availability"]', '[class*="availability"]'], 100)
+  const brand = firstText(document, ['#bylineInfo', '[data-testid*="brand"]', '[itemprop="brand"]'], 100)
+  const bullets = [...main.querySelectorAll('#feature-bullets li, [data-testid*="feature"] li, [class*="feature"] li, [class*="highlights"] li')]
+    .filter(visible).map((item) => cleanText(item.textContent, 240)).filter(Boolean).slice(0, 12)
+  const details = {}
+  for (const row of [...main.querySelectorAll('#productDetails_techSpec_section_1 tr, #productDetails_detailBullets_sections1 tr, [class*="spec"] tr, [data-testid*="spec"] tr')].slice(0, 30)) {
+    const cells = [...row.querySelectorAll('th, td')].map((cell) => cleanText(cell.textContent, 180)).filter(Boolean)
+    if (cells.length >= 2) details[cells[0]] = cells.slice(1).join(' · ')
+  }
+  for (const item of [...main.querySelectorAll('#detailBullets_feature_div li, [class*="detail"] li')].slice(0, 25)) {
+    const value = cleanText(item.textContent, 260)
+    const separator = value.indexOf(':')
+    if (separator > 0 && separator < 80) details[value.slice(0, separator)] = value.slice(separator + 1).trim()
+  }
+  const dateEntry = Object.entries(details).find(([key]) => /date first available|release date|first available|model year/i.test(key))
+  return {
+    title,
+    url: window.location.href,
+    price,
+    rating,
+    reviews,
+    availability,
+    brand,
+    launchDate: dateEntry?.[1] || '',
+    features: bullets,
+    specifications: details,
+    pageEvidence: cleanText(main.textContent, 1500),
+  }
+}
+
 function pageSummary(workflow) {
   const heading = document.querySelector('h1')?.textContent?.replace(/\s+/g, ' ').trim() || document.title
   let cards = resultElements().slice(0, 10).map((element) => element.textContent?.replace(/\s+/g, ' ').trim().slice(0, 320)).filter(Boolean)
@@ -244,8 +315,9 @@ async function executeWorkflow(message) {
   }
 
   if (!state.sorted && (allowed(workflow, 'sort') || allowed(workflow, 'select'))) {
+    if (workflow.runtimeMode === 'product-research') state.sorted = true
     const sort = findSortControl(workflow)
-    if (sort) {
+    if (sort && workflow.runtimeMode !== 'product-research') {
       await step('Sorting results', `Selecting the closest “${sort.desired}” sorting option.`)
       if (sort.control instanceof HTMLSelectElement) fill(sort.control, sort.desired)
       else sort.control.click()
@@ -260,6 +332,15 @@ async function executeWorkflow(message) {
     window.scrollBy({ top: Math.max(window.innerHeight * .75, 500), behavior: 'smooth' })
     await new Promise((resolve) => setTimeout(resolve, 650))
     cards = resultElements()
+  }
+
+  if (workflow.runtimeMode === 'product-research' && cards.length) {
+    const candidates = extractSearchCandidates()
+    if (candidates.length < 2) {
+      return { ok: true, needsTakeover: true, title: 'More product evidence is needed', detail: 'ForgeOS could not identify enough reliable product links on this result page. Try a more specific product query or take over the current tab.', runtimeState: state }
+    }
+    await step('Building a research set', `Found ${candidates.length} candidates. ForgeOS will inspect the strongest product pages before ranking them.`)
+    return { ok: true, researchPlan: { candidates }, runtimeState: { ...state, researchPrepared: true } }
   }
 
   const goal = normalized(workflow.goal)
@@ -293,6 +374,10 @@ async function executeWorkflow(message) {
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type === 'FORGEOS_EXTRACT_PRODUCT') {
+    try { sendResponse({ ok: true, product: extractProductDetail() }) } catch (error) { sendResponse({ ok: false, error: error instanceof Error ? error.message : 'Product details could not be read.' }) }
+    return false
+  }
   if (message?.type !== 'FORGEOS_EXECUTE') return false
   executeWorkflow(message)
     .then((response) => sendResponse(response))

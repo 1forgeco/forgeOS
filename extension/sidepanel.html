@@ -16,7 +16,7 @@
       <section id="empty" class="empty">
         <b>No deployed agents yet</b>
         <p>Open an agent in ForgeOS and choose <strong>Deploy to extension</strong>. It will appear here automatically.</p>
-        <a id="open-forgeos" href="https://forgeos-agent-studio.kamalkatal512.chatgpt.site/projects" target="_blank">Open ForgeOS</a>
+        <a id="open-forgeos" href="http://localhost:5173/playground" target="_blank">Open local ForgeOS</a>
       </section>
 
       <section id="library" class="library" hidden>
@@ -40,6 +40,11 @@
       </section>
 
       <section id="activity" class="activity" hidden><div><strong>Live activity</strong><span id="run-state">Running</span></div><ol id="events"></ol></section>
+      <section id="research-result" class="research-result" hidden>
+        <header><span>RESEARCH BRIEF</span><strong id="research-summary">Evidence-backed recommendations</strong></header>
+        <div id="recommendations"></div>
+        <p id="research-note"></p>
+      </section>
       <details class="manual-import"><summary>Advanced: manual JSON fallback</summary><label>Choose ForgeOS agent file<input id="file" type="file" accept="application/json,.json" /></label></details>
       <footer>ForgeOS never enters passwords, payment details, CAPTCHA, or two-factor codes.</footer>
     </main>

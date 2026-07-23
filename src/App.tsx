@@ -19,6 +19,7 @@ const RequireAccount = lazy(() => import('./features/product/components/RequireA
 export default function App() {
   return <BrowserRouter><RouteMetadata /><Suspense fallback={<div className="route-loading">Opening ForgeOS…</div>}><Routes>
     <Route path="/" element={<MarketingPage />} />
+    <Route path="/playground" element={<AgentBuilderPage />} />
     <Route path="/agents/:slug" element={<TemplateDetailPage />} />
     <Route path="/pricing" element={<PublicInfoPage kind="pricing" />} />
     <Route path="/docs" element={<PublicInfoPage kind="docs" />} />
@@ -45,7 +46,7 @@ export default function App() {
 function RouteMetadata() {
   const { pathname } = useLocation()
   useEffect(() => {
-    const appRoute = ['/login','/projects','/templates','/runs','/approvals','/connections','/settings','/new/','/app/'].some((route) => pathname.startsWith(route))
+    const appRoute = ['/login','/projects','/templates','/runs','/approvals','/connections','/settings','/new/','/app/','/playground'].some((route) => pathname.startsWith(route))
     const templateRoute = pathname.startsWith('/agents/')
     document.title = appRoute ? 'ForgeOS — Custom Browser Agents' : templateRoute ? 'Agent Template — ForgeOS by 1forge' : 'ForgeOS by 1forge — Build Custom Browser Agents'
     const robots = document.querySelector<HTMLMetaElement>('meta[name="robots"]')

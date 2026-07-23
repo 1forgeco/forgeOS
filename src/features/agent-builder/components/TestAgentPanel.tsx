@@ -11,11 +11,12 @@ type TestAgentPanelProps = {
   nodes: AgentNode[]
   edges: AgentEdge[]
   onActivity: (steps: AgentNodeKind[]) => void
+  onOpenDeploy: () => void
 }
 
 type BrowserEvent = { id: string; title: string; detail: string; state: 'running' | 'done' }
 
-export function TestAgentPanel({ agentId, title, nodes, edges, onActivity }: TestAgentPanelProps) {
+export function TestAgentPanel({ agentId, title, nodes, edges, onActivity, onOpenDeploy }: TestAgentPanelProps) {
   const compiled = useMemo(() => compileBrowserWorkflow(title, nodes, edges), [title, nodes, edges])
   const definition = compiled.definition
   const [inputs, setInputs] = useState<Record<string, string>>({})
@@ -87,16 +88,24 @@ export function TestAgentPanel({ agentId, title, nodes, edges, onActivity }: Tes
   }
 
   const orderedKinds = compiled.orderedNodes.filter((node) => node.data.kind !== 'humanTakeover').map((node) => node.data.kind)
+  const missingInputs = definition?.inputs.filter((field) => !inputs[field]?.trim()) || []
+  const canRun = Boolean(definition) && missingInputs.length === 0
 
   return (
     <main className="browser-test-view">
       <section className="test-intro browser-test-intro">
         <div>
-          <span className="view-eyebrow"><Bot size={13} /> Browser run test</span>
-          <h1>Watch the workflow prepare a real browser run.</h1>
-          <p>This verifies the saved website, goal, inputs, permissions, approval policy, and completion rule. The Chrome extension performs the page clicks in a normal tab.</p>
+          <span className="view-eyebrow"><Bot size={13} /> Test center</span>
+          <h1>Check the definition before a live browser run.</h1>
+          <p>This screen validates the graph and can preview specialist reasoning. It does not click the external website. Actual page actions happen only in the connected Chrome extension.</p>
         </div>
         <button onClick={reset}><RotateCcw size={14} /> Reset test</button>
+      </section>
+
+      <section className="test-mode-explainer">
+        <article className="active"><b>1</b><div><strong>Definition check</strong><p>Validate website, inputs, permissions and execution order.</p></div><Check size={14} /></article>
+        <article><b>2</b><div><strong>Reasoning preview</strong><p>Generate a model response without clicking the website.</p></div><Sparkles size={14} /></article>
+        <article><b>3</b><div><strong>Live browser test</strong><p>Deploy to the extension to perform visible page actions.</p></div><button onClick={onOpenDeploy}>Open deploy</button></article>
       </section>
 
       <section className="live-pipeline browser-live-pipeline" aria-label="Agent execution path">
@@ -126,7 +135,7 @@ export function TestAgentPanel({ agentId, title, nodes, edges, onActivity }: Tes
               <span className="browser-site-mark"><Globe2 size={22} /></span>
               <p>Target website</p>
               <h2>{definition ? new URL(definition.websiteUrl).hostname : 'Workflow needs attention'}</h2>
-              <small>{definition ? 'The extension opens this site in a normal browser tab. ForgeOS does not embed or imitate it.' : compiled.errors[0]}</small>
+              <small>{definition ? 'This is a definition preview. The connected extension opens and controls the real site in a normal tab.' : compiled.errors[0]}</small>
               {definition && <button onClick={openTarget}>Open site safely <ArrowUpRight size={13} /></button>}
             </div>
             <aside className="browser-side-panel">
@@ -139,7 +148,8 @@ export function TestAgentPanel({ agentId, title, nodes, edges, onActivity }: Tes
                 </div>
               )}
               <div className="side-panel-actions">
-                {running ? <button className="stop-run" onClick={reset}><CircleStop size={14} /> Stop safely</button> : <button className="start-run" onClick={() => void run()} disabled={!definition}><Play size={14} fill="currentColor" /> Test this flow</button>}
+                {missingInputs.length > 0 && <small className="missing-input-note">Complete {missingInputs.length} required input{missingInputs.length === 1 ? '' : 's'} to preview.</small>}
+                {running ? <button className="stop-run" onClick={reset}><CircleStop size={14} /> Stop preview</button> : <button className="start-run" onClick={() => void run()} disabled={!canRun}><Play size={14} fill="currentColor" /> Run reasoning preview</button>}
               </div>
             </aside>
           </div>
@@ -148,7 +158,7 @@ export function TestAgentPanel({ agentId, title, nodes, edges, onActivity }: Tes
         <aside className="browser-run-log">
           <header><div><strong>Execution trace</strong><small>{events.length ? `${events.filter((event) => event.state === 'done').length} checks passed` : 'Nothing has run yet'}</small></div>{runComplete && <span><Check size={12} /> Ready</span>}</header>
           {!definition && <div className="workflow-errors">{compiled.errors.map((error) => <p key={error}>{error}</p>)}</div>}
-          {definition && events.length === 0 && <div className="empty-trace"><Bot size={22} /><strong>Run a safe dry test</strong><p>ForgeOS will validate every part of the graph without clicking the external website.</p></div>}
+          {definition && events.length === 0 && <div className="empty-trace"><Bot size={22} /><strong>Run a definition and reasoning preview</strong><p>ForgeOS will validate the graph without clicking the external website.</p></div>}
           <div className="browser-event-list">
             {events.map((event) => <div className={`browser-event ${event.state}`} key={event.id}><span>{event.state === 'running' ? <LoaderCircle size={13} /> : <Check size={13} />}</span><div><strong>{event.title}</strong><p>{event.detail}</p></div></div>)}
           </div>

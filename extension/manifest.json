@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ForgeOS Browser Agent",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Run local or hosted ForgeOS workflows in normal browser tabs with multi-page research, visible progress, and approval controls.",
   "permissions": ["activeTab", "sidePanel", "storage", "tabs"],
   "host_permissions": ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"],

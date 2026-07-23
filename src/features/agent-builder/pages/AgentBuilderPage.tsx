@@ -15,16 +15,17 @@ import '@xyflow/react/dist/style.css'
 import {
   ArrowLeft,
   Check,
-  ChevronDown,
   Cloud,
   Code2,
   MessageSquareText,
   Play,
   Plus,
   RotateCcw,
+  Redo2,
   Save,
   Sparkles,
   Workflow,
+  Undo2,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { useParams } from 'react-router-dom'
@@ -96,6 +97,8 @@ function AgentBuilder() {
   const [saveState, setSaveState] = useState<'loading' | 'saving' | 'saved' | 'error'>(isPlayground ? 'saved' : 'loading')
   const hydrated = useRef(false)
   const activityTimer = useRef<number | null>(null)
+  const history = useRef<Array<{ nodes: AgentNode[]; edges: AgentEdge[] }>>([])
+  const future = useRef<Array<{ nodes: AgentNode[]; edges: AgentEdge[] }>>([])
   const { screenToFlowPosition, fitView } = useReactFlow<AgentNode, AgentEdge>()
 
   const selectedNode = nodes.find((node) => node.id === selectedNodeId) ?? null
@@ -107,6 +110,31 @@ function AgentBuilder() {
     const state = source?.data.status
     return { ...edge, className: state === 'running' ? 'edge-running' : state === 'success' ? 'edge-success' : edge.data?.path === 'fallback' ? 'edge-fallback' : '' }
   }), [edges, nodes])
+
+  const rememberGraph = useCallback(() => {
+    history.current = [...history.current.slice(-29), { nodes: structuredClone(nodes), edges: structuredClone(edges) }]
+    future.current = []
+  }, [edges, nodes])
+
+  const undoGraph = useCallback(() => {
+    const previous = history.current.pop()
+    if (!previous) return
+    future.current.push({ nodes: structuredClone(nodes), edges: structuredClone(edges) })
+    setNodes(previous.nodes)
+    setEdges(previous.edges)
+    setSelectedNodeId(null)
+    setNotice('Last workflow change undone')
+  }, [edges, nodes, setEdges, setNodes])
+
+  const redoGraph = useCallback(() => {
+    const next = future.current.pop()
+    if (!next) return
+    history.current.push({ nodes: structuredClone(nodes), edges: structuredClone(edges) })
+    setNodes(next.nodes)
+    setEdges(next.edges)
+    setSelectedNodeId(null)
+    setNotice('Workflow change restored')
+  }, [edges, nodes, setEdges, setNodes])
 
   useEffect(() => {
     if (!agentId) return
@@ -167,8 +195,9 @@ function AgentBuilder() {
   }, [])
 
   const onConnect = useCallback((connection: Connection) => {
+    rememberGraph()
     setEdges((current) => addEdge({ ...connection, type: 'smoothstep', animated: true, data: { path: 'primary' } }, current))
-  }, [setEdges])
+  }, [rememberGraph, setEdges])
 
   const focusKind = useCallback((kind: AgentNodeKind) => {
     const existing = nodes.find((node) => node.data.kind === kind)
@@ -185,6 +214,7 @@ function AgentBuilder() {
       setNotice(`${existing.data.label} is already in this workflow`)
       return
     }
+    rememberGraph()
     const source = afterNodeId ? nodes.find((node) => node.id === afterNodeId) : null
     const returnNode = nodes.find((node) => node.data.kind === 'returnResult')
     const incomingToResult = returnNode ? edges.find((edge) => edge.target === returnNode.id && edge.data?.path !== 'fallback') : null
@@ -208,7 +238,7 @@ function AgentBuilder() {
     }
     setSelectedNodeId(node.id)
     setNotice(`${node.data.label} added and connected`)
-  }, [edges, nodes, screenToFlowPosition, setEdges, setNodes])
+  }, [edges, nodes, rememberGraph, screenToFlowPosition, setEdges, setNodes])
 
   const onDrop = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
@@ -224,12 +254,15 @@ function AgentBuilder() {
 
   const deleteSelectedNode = () => {
     if (!selectedNodeId) return
+    rememberGraph()
     setNodes((current) => current.filter((node) => node.id !== selectedNodeId))
     setEdges((current) => current.filter((edge) => edge.source !== selectedNodeId && edge.target !== selectedNodeId))
     setSelectedNodeId(null)
   }
 
   const resetTemplate = () => {
+    if (!window.confirm('Restore the starter workflow? Your current canvas changes will be replaced.')) return
+    rememberGraph()
     setNodes(DEFAULT_NODES.map((node) => ({ ...node, data: { ...node.data, config: { ...node.data.config } } })))
     setEdges(DEFAULT_EDGES.map((edge) => ({ ...edge })))
     setSelectedNodeId(null)
@@ -295,7 +328,6 @@ function AgentBuilder() {
           <i />
           <div className="workflow-name">
             <input aria-label="Agent name" value={title} onChange={(event) => setTitle(event.target.value)} />
-            <button aria-label="Agent menu"><ChevronDown size={13} /></button>
           </div>
         </div>
 
@@ -307,7 +339,7 @@ function AgentBuilder() {
 
         <div className="studio-actions">
           <div className={`save-state ${saveState}`}><Cloud size={13} /><span>{saveState === 'saving' ? 'Saving…' : saveState === 'error' ? 'Save failed' : saveState === 'loading' ? 'Loading…' : isPlayground ? 'Saved on this device' : 'Saved to workspace'}</span></div>
-          {view === 'build' && <button className="secondary-action" onClick={simulateAgent} disabled={running || !healthy}><Play size={14} fill="currentColor" /> {running ? 'Running…' : 'Dry run'}</button>}
+          {view === 'build' && <><button className="icon-action" title="Undo graph change" aria-label="Undo graph change" onClick={undoGraph} disabled={!history.current.length}><Undo2 size={14} /></button><button className="icon-action" title="Redo graph change" aria-label="Redo graph change" onClick={redoGraph} disabled={!future.current.length}><Redo2 size={14} /></button><button className="secondary-action" onClick={simulateAgent} disabled={running || !healthy}><Play size={14} fill="currentColor" /> {running ? 'Checking…' : 'Check workflow'}</button></>}
           <button className={`publish-action${ready ? ' published' : ''}`} onClick={ready ? () => setView('install') : markReady}>{ready ? <Check size={14} /> : <Save size={14} />} {ready ? 'Ready to deploy' : 'Validate agent'}</button>
         </div>
       </header>
@@ -319,7 +351,7 @@ function AgentBuilder() {
             <div className="canvas-context">
               <button className="canvas-add-step" onClick={() => setAddMenu({ open: true, afterNodeId: null })}><Plus size={12} /> Add step</button>
               <div className="template-pill"><Sparkles size={13} /><span>Custom browser agent</span><b>Core workflow</b></div>
-              <button onClick={() => void simulateAgent()}><Play size={12} /> Preview the path</button>
+              <button onClick={() => void simulateAgent()}><Play size={12} /> Check the path</button>
               <button onClick={resetTemplate}><RotateCcw size={12} /> Start over</button>
             </div>
             <div className="canvas-guide"><b>1</b><span>Choose the website</span><i /><b>2</b><span>Describe the outcome</span><i /><b>3</b><span>Set permissions and test</span></div>
@@ -354,7 +386,7 @@ function AgentBuilder() {
         </div>
       )}
 
-      {view === 'test' && <TestAgentPanel agentId={agentId} title={title} nodes={nodes} edges={edges} onActivity={showConversationActivity} />}
+      {view === 'test' && <TestAgentPanel agentId={agentId} title={title} nodes={nodes} edges={edges} onActivity={showConversationActivity} onOpenDeploy={() => setView('install')} />}
       {view === 'install' && (isPlayground ? <section className="playground-deploy-gate"><span><Sparkles size={18} /></span><small>Playground complete</small><h1>Your workflow is ready to become a real agent.</h1><p>The playground stays private to this browser. Create an account when you want to publish immutable versions, connect the extension, synchronize results, and keep run history.</p><div><button onClick={() => setView('test')}><Play size={13} /> Keep testing</button><a href="/login?mode=register&next=/templates">Create a workspace</a></div></section> : <InstallAgentPanel agentId={agentId} title={title} nodes={nodes} edges={edges} onOpenTest={() => setView('test')} />)}
 
       {notice && <div className="studio-notice"><Check size={14} />{notice}</div>}
@@ -368,6 +400,7 @@ function AgentBuilder() {
       />
       <div className="studio-ambient studio-ambient-one" />
       <div className="studio-ambient studio-ambient-two" />
+      <section className="studio-mobile-blocker"><Workflow size={28} /><h1>Open ForgeOS on a desktop browser</h1><p>The visual canvas and Chrome extension need a desktop-sized browser. Your agents remain available in the workspace.</p><a href="/projects">Return to agents</a></section>
     </div>
   )
 }

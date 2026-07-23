@@ -146,7 +146,7 @@ export function InstallAgentPanel({ agentId, title, nodes, edges, onOpenTest }: 
         <section className="extension-capability-card">
           <header><span><Puzzle size={16} /></span><div><strong>Extension runtime</strong><p>{extension ? `Version ${extension.extensionVersion}` : 'Waiting for connection'}</p></div></header>
           <div><span><Check size={12} /> Localhost and hosted detection</span><span><Check size={12} /> Pause, stop and takeover</span><span><Check size={12} /> Multi-page product research</span><span><Check size={12} /> Evidence-backed result brief</span></div>
-          {!extension && <a href="/forgeos-extension.zip" download><Download size={13} /> Install development extension</a>}
+          {!extension && <><a href="/forgeos-extension.zip" download><Download size={13} /> Download preview extension</a><small className="extension-preview-note">Private preview: install the package from Chrome’s extension developer mode. Web Store distribution is not enabled yet.</small></>}
         </section>
       </div>
 
@@ -158,7 +158,7 @@ export function InstallAgentPanel({ agentId, title, nodes, edges, onOpenTest }: 
             <pre><code>{definition ? JSON.stringify(definition, null, 2) : JSON.stringify({ error: compiled.errors[0] ?? 'Workflow is incomplete' }, null, 2)}</code></pre>
             <div className="deploy-downloads">
               <button className="copy-code" onClick={exportAgent} disabled={!definition}>{downloaded ? <Check size={14} /> : <Download size={14} />}{downloaded ? 'Agent downloaded' : 'Download agent JSON'}</button>
-              <a href="/forgeos-extension.zip" download><Puzzle size={14} /> Download extension package</a>
+              <a href="/forgeos-extension.zip" download><Puzzle size={14} /> Download preview extension</a>
             </div>
           </section>
         </div>

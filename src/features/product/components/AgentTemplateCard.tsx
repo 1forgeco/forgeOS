@@ -22,7 +22,7 @@ export function AgentTemplateCard({ template, compact = false }: AgentTemplateCa
       {!compact && <div className="template-capabilities">{template.capabilities.map((item) => <span key={item}>{item}</span>)}</div>}
       <div className="template-card-meta"><span><ShieldCheck size={11} /> {template.risk} risk</span><span>{template.exampleSites[0]}</span></div>
       <div className="template-card-actions">
-        {available ? <><Link to={`/agents/${template.slug}`}>See details</Link><Link className="use-template" to={`/new/${template.id}`}>Use agent <ArrowUpRight size={13} /></Link></> : <><span className="coming-label">Workflow in development</span><span className="coming-hover">Coming soon</span></>}
+        {available ? <><Link to={`/agents/${template.slug}`}>See details</Link><Link className="use-template" to={`/new/${template.id}`}>{template.availability === 'beta' ? 'Build preview' : 'Use agent'} <ArrowUpRight size={13} /></Link></> : <><span className="coming-label">Workflow in development</span><span className="coming-hover">Coming soon</span></>}
       </div>
     </article>
   )

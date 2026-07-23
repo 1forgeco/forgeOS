@@ -15,6 +15,8 @@ type WorkerEnv = {
   DB?: D1Database
   OPENAI_API_KEY?: string
   OPENAI_MODEL?: string
+  GOOGLE_OAUTH_CLIENT_ID?: string
+  MICROSOFT_OAUTH_CLIENT_ID?: string
 }
 
 type ChatPayload = { message?: string; session?: BookingSession; sessionId?: string }
@@ -24,6 +26,19 @@ const SESSION_COOKIE = 'forgeos_session'
 const SESSION_DAYS = 30
 const PASSWORD_ITERATIONS = 120_000
 const EXTENSION_DEPLOYMENT_MINUTES = 5
+const DEFAULT_WORKSPACE_SETTINGS = {
+  safety: {
+    askBeforeSubmit: true,
+    stopForAuthentication: true,
+    blockPaymentDetails: true,
+    stopAfterRepeatedFailure: true,
+  },
+  notifications: {
+    approvals: true,
+    failedRuns: true,
+    successfulRuns: false,
+  },
+}
 
 const corsHeaders = (request: Request) => ({
   'Access-Control-Allow-Origin': request.headers.get('Origin') ?? '*',
@@ -241,7 +256,161 @@ async function handleAccount(request: Request, env: WorkerEnv) {
   const context = await requireProductContext(request, env)
   if ('error' in context) return context.error
   await ensureAccount(context.db, context.identity)
+  if (request.method === 'PATCH') {
+    let body: { name?: string; workspaceName?: string }
+    try { body = await request.json() as typeof body } catch { return json(request, { error: 'Enter valid account details.' }, { status: 400 }) }
+    const name = String(body.name || context.identity.name).trim().slice(0, 100)
+    const workspaceName = String(body.workspaceName || context.identity.workspaceName).trim().slice(0, 100)
+    if (name.length < 2 || workspaceName.length < 2) return json(request, { error: 'Name and workspace name must contain at least two characters.' }, { status: 400 })
+    await context.db.batch([
+      context.db.prepare('UPDATE users SET name = ? WHERE id = ?').bind(name, context.identity.id),
+      context.db.prepare('UPDATE workspaces SET name = ? WHERE id = ?').bind(workspaceName, context.identity.workspaceId),
+    ])
+    return json(request, accountBody({ ...context.identity, name, workspaceName }))
+  }
   return json(request, accountBody(context.identity))
+}
+
+function sanitizeWorkspaceSettings(value: unknown) {
+  const root = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  const safety = root.safety && typeof root.safety === 'object' ? root.safety as Record<string, unknown> : {}
+  const notifications = root.notifications && typeof root.notifications === 'object' ? root.notifications as Record<string, unknown> : {}
+  return {
+    safety: {
+      askBeforeSubmit: safety.askBeforeSubmit !== false,
+      stopForAuthentication: safety.stopForAuthentication !== false,
+      blockPaymentDetails: safety.blockPaymentDetails !== false,
+      stopAfterRepeatedFailure: safety.stopAfterRepeatedFailure !== false,
+    },
+    notifications: {
+      approvals: notifications.approvals !== false,
+      failedRuns: notifications.failedRuns !== false,
+      successfulRuns: notifications.successfulRuns === true,
+    },
+  }
+}
+
+async function handleSettings(request: Request, env: WorkerEnv) {
+  const context = await requireProductContext(request, env)
+  if ('error' in context) return context.error
+  if (request.method === 'GET') {
+    const row = await context.db.prepare('SELECT settings_json, updated_at FROM workspace_preferences WHERE workspace_id = ?')
+      .bind(context.identity.workspaceId).first<{ settings_json: string; updated_at: string }>()
+    return json(request, { settings: row ? sanitizeWorkspaceSettings(parseJson(row.settings_json, DEFAULT_WORKSPACE_SETTINGS)) : DEFAULT_WORKSPACE_SETTINGS, updatedAt: row?.updated_at || null })
+  }
+  let body: { settings?: unknown }
+  try { body = await request.json() as typeof body } catch { return json(request, { error: 'The workspace settings were not valid.' }, { status: 400 }) }
+  const settings = sanitizeWorkspaceSettings(body.settings)
+  await context.db.prepare(`INSERT INTO workspace_preferences (workspace_id, settings_json, updated_at)
+    VALUES (?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(workspace_id) DO UPDATE SET settings_json = excluded.settings_json, updated_at = CURRENT_TIMESTAMP`)
+    .bind(context.identity.workspaceId, JSON.stringify(settings)).run()
+  return json(request, { settings, updatedAt: new Date().toISOString() })
+}
+
+async function handleChangePassword(request: Request, env: WorkerEnv) {
+  const context = await requireProductContext(request, env)
+  if ('error' in context) return context.error
+  let body: { currentPassword?: string; newPassword?: string }
+  try { body = await request.json() as typeof body } catch { return json(request, { error: 'Enter your current and new password.' }, { status: 400 }) }
+  const currentPassword = String(body.currentPassword || '')
+  const newPassword = String(body.newPassword || '')
+  if (newPassword.length < 10 || newPassword.length > 128) return json(request, { error: 'Use a new password between 10 and 128 characters.' }, { status: 400 })
+  const credential = await context.db.prepare('SELECT password_hash, password_salt, password_iterations FROM auth_credentials WHERE user_id = ?')
+    .bind(context.identity.id).first<{ password_hash: string; password_salt: string; password_iterations: number }>()
+  if (!credential) return json(request, { error: 'Password login is not enabled for this account.' }, { status: 409 })
+  const candidate = await hashPassword(currentPassword, base64UrlToBytes(credential.password_salt), credential.password_iterations)
+  if (!safeEqual(candidate, credential.password_hash)) return json(request, { error: 'The current password is incorrect.' }, { status: 403 })
+  const salt = crypto.getRandomValues(new Uint8Array(16))
+  const passwordHash = await hashPassword(newPassword, salt)
+  await context.db.batch([
+    context.db.prepare('UPDATE auth_credentials SET password_hash = ?, password_salt = ?, password_iterations = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
+      .bind(passwordHash, bytesToBase64Url(salt), PASSWORD_ITERATIONS, context.identity.id),
+    context.db.prepare('DELETE FROM user_sessions WHERE user_id = ?').bind(context.identity.id),
+  ])
+  const token = await createSession(context.db, context.identity.id)
+  return json(request, { ok: true }, { headers: { 'Set-Cookie': sessionCookie(request, token, SESSION_DAYS * 86_400) } })
+}
+
+async function handleWorkspaceExport(request: Request, env: WorkerEnv) {
+  const context = await requireProductContext(request, env)
+  if ('error' in context) return context.error
+  const [agents, versions, runs, events, approvals, connections, preferences] = await Promise.all([
+    context.db.prepare('SELECT * FROM agents WHERE workspace_id = ? ORDER BY created_at').bind(context.identity.workspaceId).all(),
+    context.db.prepare('SELECT * FROM agent_versions WHERE workspace_id = ? ORDER BY created_at').bind(context.identity.workspaceId).all(),
+    context.db.prepare('SELECT * FROM agent_runs WHERE workspace_id = ? ORDER BY started_at').bind(context.identity.workspaceId).all(),
+    context.db.prepare('SELECT * FROM agent_run_events WHERE workspace_id = ? ORDER BY created_at').bind(context.identity.workspaceId).all(),
+    context.db.prepare('SELECT * FROM approval_requests WHERE workspace_id = ? ORDER BY created_at').bind(context.identity.workspaceId).all(),
+    context.db.prepare('SELECT id, provider, status, created_at, updated_at FROM workspace_connections WHERE workspace_id = ?').bind(context.identity.workspaceId).all(),
+    context.db.prepare('SELECT settings_json, updated_at FROM workspace_preferences WHERE workspace_id = ?').bind(context.identity.workspaceId).first(),
+  ])
+  return json(request, {
+    exportedAt: new Date().toISOString(),
+    account: accountBody(context.identity),
+    agents: agents.results || [],
+    versions: versions.results || [],
+    runs: runs.results || [],
+    runEvents: events.results || [],
+    approvals: approvals.results || [],
+    connections: connections.results || [],
+    preferences,
+  })
+}
+
+async function handleDeleteWorkspace(request: Request, env: WorkerEnv) {
+  const context = await requireProductContext(request, env)
+  if ('error' in context) return context.error
+  let body: { confirmation?: string; password?: string }
+  try { body = await request.json() as typeof body } catch { return json(request, { error: 'Type DELETE to confirm.' }, { status: 400 }) }
+  if (body.confirmation !== 'DELETE') return json(request, { error: 'Type DELETE exactly to remove the workspace.' }, { status: 400 })
+  const credential = await context.db.prepare('SELECT password_hash, password_salt, password_iterations FROM auth_credentials WHERE user_id = ?')
+    .bind(context.identity.id).first<{ password_hash: string; password_salt: string; password_iterations: number }>()
+  if (credential) {
+    const candidate = await hashPassword(String(body.password || ''), base64UrlToBytes(credential.password_salt), credential.password_iterations)
+    if (!safeEqual(candidate, credential.password_hash)) return json(request, { error: 'Enter the correct account password.' }, { status: 403 })
+  }
+  const workspaceId = context.identity.workspaceId
+  const statements = [
+    context.db.prepare('DELETE FROM workspace_preferences WHERE workspace_id = ?').bind(workspaceId),
+    context.db.prepare('DELETE FROM workspace_connections WHERE workspace_id = ?').bind(workspaceId),
+    context.db.prepare('DELETE FROM extension_deployments WHERE workspace_id = ?').bind(workspaceId),
+    context.db.prepare('DELETE FROM extension_installations WHERE workspace_id = ?').bind(workspaceId),
+    context.db.prepare('DELETE FROM approval_requests WHERE workspace_id = ?').bind(workspaceId),
+    context.db.prepare('DELETE FROM agent_run_events WHERE workspace_id = ?').bind(workspaceId),
+    context.db.prepare('DELETE FROM agent_runs WHERE workspace_id = ?').bind(workspaceId),
+    context.db.prepare('DELETE FROM agent_versions WHERE workspace_id = ?').bind(workspaceId),
+    context.db.prepare('DELETE FROM agents WHERE workspace_id = ?').bind(workspaceId),
+    context.db.prepare('DELETE FROM workspace_members WHERE workspace_id = ?').bind(workspaceId),
+    context.db.prepare('DELETE FROM workspaces WHERE id = ?').bind(workspaceId),
+    context.db.prepare('DELETE FROM user_sessions WHERE user_id = ?').bind(context.identity.id),
+    context.db.prepare('DELETE FROM auth_credentials WHERE user_id = ?').bind(context.identity.id),
+    context.db.prepare('DELETE FROM users WHERE id = ?').bind(context.identity.id),
+  ]
+  await context.db.batch(statements)
+  return json(request, { ok: true }, { headers: { 'Set-Cookie': sessionCookie(request, '', 0) } })
+}
+
+async function handleDashboard(request: Request, env: WorkerEnv) {
+  const context = await requireProductContext(request, env)
+  if ('error' in context) return context.error
+  const monthStart = new Date()
+  monthStart.setUTCDate(1)
+  monthStart.setUTCHours(0, 0, 0, 0)
+  const [agentCount, liveCount, runCount, approvalCount, extensionCount] = await Promise.all([
+    context.db.prepare('SELECT COUNT(*) AS count FROM agents WHERE workspace_id = ?').bind(context.identity.workspaceId).first<{ count: number }>(),
+    context.db.prepare("SELECT COUNT(*) AS count FROM agents WHERE workspace_id = ? AND status = 'live'").bind(context.identity.workspaceId).first<{ count: number }>(),
+    context.db.prepare('SELECT COUNT(*) AS count FROM agent_runs WHERE workspace_id = ? AND datetime(started_at) >= datetime(?)').bind(context.identity.workspaceId, monthStart.toISOString()).first<{ count: number }>(),
+    context.db.prepare("SELECT COUNT(*) AS count FROM approval_requests WHERE workspace_id = ? AND status = 'pending'").bind(context.identity.workspaceId).first<{ count: number }>(),
+    context.db.prepare('SELECT COUNT(*) AS count FROM extension_installations WHERE workspace_id = ? AND revoked_at IS NULL').bind(context.identity.workspaceId).first<{ count: number }>(),
+  ])
+  return json(request, {
+    agents: Number(agentCount?.count || 0),
+    liveAgents: Number(liveCount?.count || 0),
+    runsThisMonth: Number(runCount?.count || 0),
+    pendingApprovals: Number(approvalCount?.count || 0),
+    connectedExtensions: Number(extensionCount?.count || 0),
+    reasoningReady: Boolean(env.OPENAI_API_KEY),
+  })
 }
 
 async function handleAgents(request: Request, env: WorkerEnv) {
@@ -557,6 +726,28 @@ async function handleRuns(request: Request, env: WorkerEnv) {
   return json(request, { runs: (result.results || []).map((row) => ({ id: row.id, agentId: row.agent_id, agentName: row.agent_name, status: row.status, goal: row.goal, result: row.result, startedAt: row.started_at, completedAt: row.completed_at })) })
 }
 
+async function handleRunDetail(request: Request, env: WorkerEnv, runId: string) {
+  const context = await requireProductContext(request, env)
+  if ('error' in context) return context.error
+  const run = await context.db.prepare(`SELECT r.id, r.agent_id, a.name AS agent_name, a.website_url, r.status, r.goal, r.result, r.started_at, r.completed_at
+    FROM agent_runs r JOIN agents a ON a.id = r.agent_id
+    WHERE r.id = ? AND r.workspace_id = ?`)
+    .bind(runId, context.identity.workspaceId).first<Record<string, string | null>>()
+  if (!run) return json(request, { error: 'Run not found in this workspace.' }, { status: 404 })
+  const events = await context.db.prepare('SELECT id, state, title, detail, created_at FROM agent_run_events WHERE run_id = ? AND workspace_id = ? ORDER BY created_at')
+    .bind(runId, context.identity.workspaceId).all<Record<string, string>>()
+  const approvals = await context.db.prepare('SELECT id, action, details, status, created_at, resolved_at FROM approval_requests WHERE run_id = ? AND workspace_id = ? ORDER BY created_at')
+    .bind(runId, context.identity.workspaceId).all<Record<string, string | null>>()
+  return json(request, {
+    run: {
+      id: run.id, agentId: run.agent_id, agentName: run.agent_name, websiteUrl: run.website_url,
+      status: run.status, goal: run.goal, result: run.result, startedAt: run.started_at, completedAt: run.completed_at,
+      events: (events.results || []).map((event) => ({ id: event.id, state: event.state, title: event.title, detail: event.detail, createdAt: event.created_at })),
+      approvals: (approvals.results || []).map((approval) => ({ id: approval.id, action: approval.action, details: approval.details, status: approval.status, createdAt: approval.created_at, resolvedAt: approval.resolved_at })),
+    },
+  })
+}
+
 async function handleApprovals(request: Request, env: WorkerEnv, approvalId?: string) {
   const context = await requireProductContext(request, env)
   if ('error' in context) return context.error
@@ -567,15 +758,25 @@ async function handleApprovals(request: Request, env: WorkerEnv, approvalId?: st
     await context.db.prepare('UPDATE approval_requests SET status = ?, resolved_at = CURRENT_TIMESTAMP WHERE id = ? AND workspace_id = ?').bind(status, approvalId, context.identity.workspaceId).run()
     return json(request, { ok: true })
   }
-  const result = await context.db.prepare('SELECT p.id, p.agent_id, a.name AS agent_name, p.action, p.details, p.status, p.created_at FROM approval_requests p JOIN agents a ON a.id = p.agent_id WHERE p.workspace_id = ? ORDER BY p.created_at DESC LIMIT 100').bind(context.identity.workspaceId).all<Record<string, string>>()
-  return json(request, { approvals: (result.results || []).map((row) => ({ id: row.id, agentId: row.agent_id, agentName: row.agent_name, action: row.action, details: row.details, status: row.status, createdAt: row.created_at })) })
+  const result = await context.db.prepare('SELECT p.id, p.run_id, p.agent_id, a.name AS agent_name, a.website_url, p.action, p.details, p.status, p.created_at, p.resolved_at FROM approval_requests p JOIN agents a ON a.id = p.agent_id WHERE p.workspace_id = ? ORDER BY p.created_at DESC LIMIT 100').bind(context.identity.workspaceId).all<Record<string, string | null>>()
+  return json(request, { approvals: (result.results || []).map((row) => ({ id: row.id, runId: row.run_id, agentId: row.agent_id, agentName: row.agent_name, websiteUrl: row.website_url, action: row.action, details: row.details, status: row.status, createdAt: row.created_at, resolvedAt: row.resolved_at })) })
 }
 
 async function handleConnections(request: Request, env: WorkerEnv) {
   const context = await requireProductContext(request, env)
   if ('error' in context) return context.error
-  const result = await context.db.prepare('SELECT id, provider, status FROM workspace_connections WHERE workspace_id = ? ORDER BY provider').bind(context.identity.workspaceId).all<{ id: string; provider: string; status: string }>()
-  return json(request, { connections: result.results || [] })
+  const result = await context.db.prepare('SELECT id, provider, status, created_at, updated_at FROM workspace_connections WHERE workspace_id = ? ORDER BY provider').bind(context.identity.workspaceId).all<Record<string, string>>()
+  const extensions = await context.db.prepare('SELECT installation_id, extension_version, label, last_seen_at FROM extension_installations WHERE workspace_id = ? AND revoked_at IS NULL ORDER BY last_seen_at DESC')
+    .bind(context.identity.workspaceId).all<Record<string, string>>()
+  return json(request, {
+    connections: (result.results || []).map((row) => ({ id: row.id, provider: row.provider, status: row.status, createdAt: row.created_at, updatedAt: row.updated_at })),
+    runtime: {
+      reasoning: env.OPENAI_API_KEY ? 'ready' : 'needs-server-key',
+      googleOAuth: env.GOOGLE_OAUTH_CLIENT_ID ? 'configured' : 'not-configured',
+      microsoftOAuth: env.MICROSOFT_OAUTH_CLIENT_ID ? 'configured' : 'not-configured',
+    },
+    extensions: (extensions.results || []).map((row) => ({ installationId: row.installation_id, extensionVersion: row.extension_version, label: row.label, lastSeenAt: row.last_seen_at })),
+  })
 }
 
 async function saveBookingTurn(env: WorkerEnv, sessionId: string, message: string, result: BookingAgentResponse) {
@@ -609,7 +810,12 @@ export default {
       if (url.pathname === '/api/auth/register' && request.method === 'POST') return await handleRegister(request, env)
       if (url.pathname === '/api/auth/login' && request.method === 'POST') return await handleLogin(request, env)
       if (url.pathname === '/api/auth/logout' && request.method === 'POST') return await handleLogout(request, env)
-      if (url.pathname === '/api/account' && request.method === 'GET') return await handleAccount(request, env)
+      if (url.pathname === '/api/account' && ['GET', 'PATCH'].includes(request.method)) return await handleAccount(request, env)
+      if (url.pathname === '/api/account/password' && request.method === 'POST') return await handleChangePassword(request, env)
+      if (url.pathname === '/api/account/export' && request.method === 'GET') return await handleWorkspaceExport(request, env)
+      if (url.pathname === '/api/account' && request.method === 'DELETE') return await handleDeleteWorkspace(request, env)
+      if (url.pathname === '/api/settings' && ['GET', 'PATCH'].includes(request.method)) return await handleSettings(request, env)
+      if (url.pathname === '/api/dashboard' && request.method === 'GET') return await handleDashboard(request, env)
       if (url.pathname === '/api/extension/pair' && request.method === 'POST') return await handlePairExtension(request, env)
       if (url.pathname === '/api/extension/pair' && request.method === 'DELETE') return await handleDisconnectExtension(request, env)
       if (url.pathname === '/api/extension/agents' && request.method === 'GET') return await handleExtensionAgents(request, env)
@@ -638,6 +844,8 @@ export default {
       const runMatch = url.pathname.match(/^\/api\/agents\/([^/]+)\/runs$/)
       if (runMatch && request.method === 'POST') return await handleRecordRun(request, env, decodeURIComponent(runMatch[1]))
       if (url.pathname === '/api/runs' && request.method === 'GET') return await handleRuns(request, env)
+      const runDetailMatch = url.pathname.match(/^\/api\/runs\/([^/]+)$/)
+      if (runDetailMatch && request.method === 'GET') return await handleRunDetail(request, env, decodeURIComponent(runDetailMatch[1]))
       if (url.pathname === '/api/approvals' && request.method === 'GET') return await handleApprovals(request, env)
       const approvalMatch = url.pathname.match(/^\/api\/approvals\/([^/]+)$/)
       if (approvalMatch && request.method === 'PATCH') return await handleApprovals(request, env, decodeURIComponent(approvalMatch[1]))

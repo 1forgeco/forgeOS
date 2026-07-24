@@ -17,6 +17,7 @@ import {
   Check,
   Cloud,
   Code2,
+  Maximize2,
   MessageSquareText,
   Play,
   Plus,
@@ -147,7 +148,7 @@ function AgentBuilder() {
         return node
       }) : agent.nodes
       setTitle(agent.name); setNodes(upgradedNodes); setEdges(agent.edges); setReady(agent.status === 'live' || agent.status === 'testing'); hydrated.current = true; setSaveState('saved')
-      window.setTimeout(() => void fitView({ padding: 0.16, duration: 450 }), 80)
+      window.setTimeout(() => void fitView({ padding: 0.1, minZoom: 0.65, duration: 450 }), 80)
     }).catch(() => { if (!cancelled) { hydrated.current = true; setSaveState('error'); setNotice('This agent could not be loaded') } })
     return () => { cancelled = true }
   }, [agentId, fitView, setEdges, setNodes])
@@ -271,7 +272,7 @@ function AgentBuilder() {
     setShowRun(false)
     setTitle('Product Research Agent')
     setNotice('Custom browser workflow restored')
-    window.setTimeout(() => void fitView({ padding: 0.16, duration: 500 }), 50)
+    window.setTimeout(() => void fitView({ padding: 0.1, minZoom: 0.65, duration: 500 }), 50)
   }
 
   const simulateAgent = async () => {
@@ -352,6 +353,7 @@ function AgentBuilder() {
               <button className="canvas-add-step" onClick={() => setAddMenu({ open: true, afterNodeId: null })}><Plus size={12} /> Add step</button>
               <div className="template-pill"><Sparkles size={13} /><span>Custom browser agent</span><b>Core workflow</b></div>
               <button onClick={() => void simulateAgent()}><Play size={12} /> Check the path</button>
+              <button onClick={() => void fitView({ padding: 0.1, minZoom: 0.65, duration: 350 })}><Maximize2 size={12} /> Fit view</button>
               <button onClick={resetTemplate}><RotateCcw size={12} /> Start over</button>
             </div>
             <div className="canvas-guide"><b>1</b><span>Choose the website</span><i /><b>2</b><span>Describe the outcome</span><i /><b>3</b><span>Set permissions and test</span></div>
@@ -367,8 +369,8 @@ function AgentBuilder() {
               onNodeClick={(_, node) => setSelectedNodeId(node.id)}
               onPaneClick={() => setSelectedNodeId(null)}
               fitView
-              fitViewOptions={{ padding: 0.16 }}
-              minZoom={0.25}
+              fitViewOptions={{ padding: 0.1, minZoom: 0.65 }}
+              minZoom={0.4}
               maxZoom={1.6}
               defaultEdgeOptions={{ type: 'smoothstep', animated: true }}
               connectionLineStyle={{ stroke: '#7668f7', strokeWidth: 2 }}

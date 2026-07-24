@@ -9,6 +9,7 @@ import {
   UserRoundCheck,
 } from 'lucide-react'
 import type { AgentNodeKind, NodeCategory, NodeConfig } from '../types'
+import { APPROVAL_CATALOG, DEFAULT_APPROVAL_STRING } from './approvalCatalog'
 
 export type ConfigField = {
   key: string
@@ -123,8 +124,8 @@ export const NODE_REGISTRY: Record<AgentNodeKind, NodeDefinition> = {
     icon: BadgeCheck,
     color: '#d04f81',
     softColor: '#ffedf4',
-    config: { approvalActions: 'payment, purchase, submit form, send message, publish, delete, accept terms' },
-    fields: [{ key: 'approvalActions', label: 'Which actions always need your approval?', type: 'multiselect', options: ['payment', 'purchase', 'submit form', 'send message', 'publish', 'delete', 'accept terms', 'create appointment', 'reschedule appointment', 'transfer call', 'sign'].map((value) => ({ label: value.replace(/\b\w/g, (letter) => letter.toUpperCase()), value })), hint: 'Click to require approval. Login, CAPTCHA, payment details and two-factor checks always require takeover.' }],
+    config: { approvalActions: DEFAULT_APPROVAL_STRING },
+    fields: [{ key: 'approvalActions', label: 'Which actions always need your approval?', type: 'multiselect', options: APPROVAL_CATALOG.map((value) => ({ label: value.replace(/\b\w/g, (letter) => letter.toUpperCase()), value })), hint: 'Click to require approval. Login, CAPTCHA, payment details and two-factor checks always require takeover.' }],
   },
   returnResult: {
     kind: 'returnResult',

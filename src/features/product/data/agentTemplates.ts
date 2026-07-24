@@ -1,8 +1,9 @@
 import { DEFAULT_EDGES, DEFAULT_NODES } from '../../agent-builder/data/defaultWorkflow'
 import type { AgentEdge, AgentNode } from '../../agent-builder/types'
+import { DEFAULT_APPROVAL_STRING } from '../../agent-builder/data/approvalCatalog'
 import type { AgentTemplate } from '../types'
 
-const DEFAULT_APPROVALS = 'payment, purchase, submit form, send message, publish, delete, accept terms, create appointment, transfer call'
+const DEFAULT_APPROVALS = DEFAULT_APPROVAL_STRING
 
 function template(value: Omit<AgentTemplate, 'runtimeMode' | 'requiredConnections' | 'approvalDefaults'> & Partial<Pick<AgentTemplate, 'runtimeMode' | 'requiredConnections' | 'approvalDefaults'>>): AgentTemplate {
   return {

@@ -13,6 +13,7 @@
     "extension:package": "cd extension && zip -FS -q -r ../public/forgeos-extension.zip .",
     "lint": "oxlint",
     "test:extension-api": "node scripts/test-extension-api.mjs",
+    "test:approvals": "node --import tsx/esm scripts/test-approval-catalog.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

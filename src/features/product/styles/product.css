@@ -233,3 +233,68 @@
   .connection-runtime-grid article { grid-template-columns: 44px 1fr; }
   .connection-runtime-grid b { grid-column: 2; width: max-content; }
 }
+
+@media (max-width: 480px) {
+  /* ── Connections page ── */
+
+  /* Page heading: always single-column on narrow viewports */
+  .connections-page .product-page-heading {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  /* Runtime status cards (Browser extensions / Specialist reasoning):
+     Drop the 3-column layout to icon + text only; badge wraps below */
+  .connection-runtime-grid article {
+    grid-template-columns: 44px 1fr;
+    gap: 10px;
+  }
+  .connection-runtime-grid article > b {
+    grid-column: 2;
+    width: max-content;
+    margin-top: 2px;
+  }
+
+  /* Provider cards: reflow from [icon | text | badge+button] into a
+     full-width stacked card so long badge text ("Not enabled on this
+     deployment") never overflows the 390px viewport */
+  .connection-grid article {
+    grid-template-columns: 36px 1fr;
+    grid-template-rows: auto auto auto;
+    gap: 8px 10px;
+    align-items: start;
+    padding: 14px;
+  }
+
+  /* Icon stays top-left, spanning row 1 */
+  .connection-grid article > span {
+    grid-column: 1;
+    grid-row: 1;
+    width: 36px;
+    height: 36px;
+  }
+
+  /* Title + description in column 2, rows 1–2 */
+  .connection-grid article > div {
+    grid-column: 2;
+    grid-row: 1 / 3;
+  }
+
+  /* Badge: full width below icon+text, wraps long strings */
+  .connection-grid small {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    width: auto;
+    max-width: 100%;
+    white-space: normal;
+    line-height: 1.4;
+  }
+
+  /* Action button: full width below badge */
+  .connection-grid button {
+    grid-column: 1 / -1;
+    grid-row: 4;
+    width: 100%;
+    height: 36px;
+  }
+}

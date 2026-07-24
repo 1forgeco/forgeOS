@@ -1061,5 +1061,10 @@
   .studio-mobile-blocker > svg { color: #6659c2; }
   .studio-mobile-blocker h1 { margin: 18px 0 0; font-size: 32px; line-height: 1; letter-spacing: -.055em; }
   .studio-mobile-blocker p { max-width: 480px; margin: 14px 0 0; color: #747884; font-size: 14px; line-height: 1.6; }
-  .studio-mobile-blocker a { min-height: 44px; margin-top: 22px; display: inline-flex; align-items: center; padding: 0 15px; border-radius: 10px; color: #fff; background: #25262c; font-size: 13px; font-weight: 700; }
+  .studio-mobile-blocker-actions { margin-top: 24px; display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; max-width: 320px; }
+  .studio-blocker-btn { width: 100%; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 0 16px; border-radius: 10px; font-size: 13px; font-weight: 700; text-decoration: none; cursor: pointer; transition: background .18s ease, transform .18s ease; }
+  .studio-blocker-btn:hover { transform: translateY(-1px); }
+  .studio-blocker-btn.primary { color: #fff; background: #25262c; border: 1px solid #25262c; }
+  .studio-blocker-btn.secondary { color: #353740; background: #fff; border: 1px solid var(--studio-border); }
+  .studio-blocker-btn.tertiary { color: #6659c2; background: transparent; border: 1px dashed rgba(102, 89, 194, 0.35); font-size: 12.5px; font-weight: 600; }
 }

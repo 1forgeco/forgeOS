@@ -17,6 +17,8 @@ import {
   Check,
   Cloud,
   Code2,
+  Copy,
+  LogIn,
   MessageSquareText,
   Play,
   Plus,
@@ -30,6 +32,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { productApi } from '../../product/api'
+import type { AccountSession } from '../../product/types'
 import { AgentNodeCard } from '../components/AgentNodeCard'
 import { AddStepMenu } from '../components/AddStepMenu'
 import { InspectorPanel } from '../components/InspectorPanel'
@@ -95,7 +98,25 @@ function AgentBuilder() {
   const [notice, setNotice] = useState('')
   const [addMenu, setAddMenu] = useState<{ open: boolean; afterNodeId: string | null }>({ open: false, afterNodeId: null })
   const [saveState, setSaveState] = useState<'loading' | 'saving' | 'saved' | 'error'>(isPlayground ? 'saved' : 'loading')
+  const [session, setSession] = useState<AccountSession | null>(null)
+  const [copiedLink, setCopiedLink] = useState(false)
   const hydrated = useRef(false)
+
+  useEffect(() => {
+    productApi.session().then(setSession).catch(() => setSession({ authenticated: false, user: null, workspace: null }))
+  }, [])
+
+  const copyDesktopLink = useCallback(() => {
+    try {
+      void navigator.clipboard.writeText(window.location.href)
+      setCopiedLink(true)
+      window.setTimeout(() => setCopiedLink(false), 2500)
+    } catch {
+      // Clipboard fallback
+    }
+  }, [])
+
+  const isAuthenticated = Boolean(session?.authenticated)
   const activityTimer = useRef<number | null>(null)
   const history = useRef<Array<{ nodes: AgentNode[]; edges: AgentEdge[] }>>([])
   const future = useRef<Array<{ nodes: AgentNode[]; edges: AgentEdge[] }>>([])
@@ -400,7 +421,40 @@ function AgentBuilder() {
       />
       <div className="studio-ambient studio-ambient-one" />
       <div className="studio-ambient studio-ambient-two" />
-      <section className="studio-mobile-blocker"><Workflow size={28} /><h1>Open ForgeOS on a desktop browser</h1><p>The visual canvas and Chrome extension need a desktop-sized browser. Your agents remain available in the workspace.</p><a href="/projects">Return to agents</a></section>
+      <section className="studio-mobile-blocker">
+        <Workflow size={28} />
+        <h1>Open ForgeOS on a desktop browser</h1>
+        <p>
+          {isAuthenticated
+            ? 'The visual workflow canvas and Chrome extension require a desktop-sized browser. Your agents and workspace remain available.'
+            : 'The visual workflow canvas and Chrome extension require a desktop-sized browser. Visit ForgeOS on your computer to build and run custom browser agents.'}
+        </p>
+        <div className="studio-mobile-blocker-actions">
+          {isAuthenticated ? (
+            <>
+              <a href="/projects" className="studio-blocker-btn primary">
+                Return to agents
+              </a>
+              <a href="/" className="studio-blocker-btn secondary">
+                ForgeOS home
+              </a>
+            </>
+          ) : (
+            <>
+              <a href="/" className="studio-blocker-btn primary">
+                Go to ForgeOS home
+              </a>
+              <a href="/login" className="studio-blocker-btn secondary">
+                <LogIn size={14} /> Log in to workspace
+              </a>
+            </>
+          )}
+          <button type="button" onClick={copyDesktopLink} className="studio-blocker-btn tertiary">
+            {copiedLink ? <Check size={14} /> : <Copy size={14} />}
+            {copiedLink ? 'Link copied to clipboard!' : 'Copy link for desktop'}
+          </button>
+        </div>
+      </section>
     </div>
   )
 }

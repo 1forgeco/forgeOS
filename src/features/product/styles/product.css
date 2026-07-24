@@ -227,9 +227,34 @@
   .record-list-heading,
   .record-filters,
   .template-library-toolbar { align-items: stretch; flex-direction: column; }
+  .record-list-heading { gap: 12px; }
+  .record-list-heading > div:first-child { flex-wrap: wrap; }
   .record-filters label,
   .record-filters select,
   .template-filter-controls select { width: 100%; }
   .connection-runtime-grid article { grid-template-columns: 44px 1fr; }
   .connection-runtime-grid b { grid-column: 2; width: max-content; }
+}
+
+@media (max-width: 480px) {
+  /* Collapse the 3-column metrics row into a single horizontal strip
+     so no card overflows the 390px viewport. */
+  .records-summary {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .records-summary article {
+    min-height: 0;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .records-summary strong {
+    margin-top: 0;
+    font-size: 18px;
+  }
+  /* Prevent the search label from setting a fixed width wider than the viewport */
+  .record-list-heading label,
+  .agents-toolbar label { width: 100%; }
 }

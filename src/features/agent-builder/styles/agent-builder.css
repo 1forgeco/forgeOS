@@ -12,7 +12,7 @@
 .studio-page {
   position: fixed;
   inset: 0;
-  min-width: 760px;
+  min-width: 901px;
   overflow: hidden;
   background: #f4f6fa;
   color: var(--studio-ink);
@@ -1049,7 +1049,7 @@
   .test-mode-explainer { grid-template-columns: 1fr; }
 }
 
-@media (max-width: 759px) {
+@media (max-width: 900px) {
   .studio-page { min-width: 0; overflow: auto; }
   .studio-header,
   .studio-body,

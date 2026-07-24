@@ -1,4 +1,8 @@
 import { spawn } from 'node:child_process'
+import { mkdir } from 'node:fs/promises'
+
+// Ensure dist/client exists so Wrangler doesn't fail due to missing assets directory
+await mkdir(new URL('../dist/client', import.meta.url), { recursive: true })
 
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 
